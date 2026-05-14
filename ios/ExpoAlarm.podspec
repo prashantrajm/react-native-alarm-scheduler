@@ -14,7 +14,7 @@ Pod::Spec.new do |s|
     :ios => '15.1'
   }
   s.swift_version  = '5.9'
-  s.source         = { git: 'https://github.com/rajmaurya-dev/expo-alarm' }
+  s.source         = { git: 'https://github.com/rajmaurya-dev/react-native-alarm-scheduler' }
   s.static_framework = true
 
   s.dependency 'ExpoModulesCore'
