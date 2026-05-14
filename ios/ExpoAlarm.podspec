@@ -11,11 +11,10 @@ Pod::Spec.new do |s|
   s.author         = package['author']
   s.homepage       = package['homepage']
   s.platforms      = {
-    :ios => '15.1',
-    :tvos => '15.1'
+    :ios => '15.1'
   }
   s.swift_version  = '5.9'
-  s.source         = { git: 'https://github.com/rajmaurya-dev/my-module' }
+  s.source         = { git: 'https://github.com/rajmaurya-dev/expo-alarm' }
   s.static_framework = true
 
   s.dependency 'ExpoModulesCore'

@@ -1,19 +1,39 @@
-import type { StyleProp, ViewStyle } from 'react-native';
+export type AlarmAuthorizationStatus =
+  | "authorized"
+  | "denied"
+  | "notDetermined"
+  | "unavailable"
+  | "unknown";
 
-export type OnLoadEventPayload = {
-  url: string;
+export type AlarmPermissionResponse = {
+  platform: "android" | "ios";
+  status: AlarmAuthorizationStatus;
+  canScheduleExactAlarms: boolean;
+  canOpenSettings: boolean;
 };
 
 export type ExpoAlarmModuleEvents = {
-  onChange: (params: ChangeEventPayload) => void;
+  onAlarmTriggered: (alarm: ScheduledAlarm) => void;
 };
 
-export type ChangeEventPayload = {
-  value: string;
+export type AlarmWeekday = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+export type AlarmScheduleInput = {
+  id?: string;
+  hour: number;
+  minute: number;
+  title?: string;
+  weekdays?: AlarmWeekday[];
+  timestamp?: number;
+  showUi?: boolean;
 };
 
-export type ExpoAlarmViewProps = {
-  url: string;
-  onLoad: (event: { nativeEvent: OnLoadEventPayload }) => void;
-  style?: StyleProp<ViewStyle>;
+export type ScheduledAlarm = {
+  id: string;
+  hour: number;
+  minute: number;
+  title: string;
+  weekdays: AlarmWeekday[];
+  timestamp: number;
+  platform: "android" | "ios";
 };

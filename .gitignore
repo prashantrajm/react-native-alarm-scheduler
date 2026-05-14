@@ -55,3 +55,9 @@ yarn-error.log
 
 # Expo
 .expo/*
+
+# Codex local config and skills
+.agents/
+.codex/
+skills-lock.json
+codex*.local.*

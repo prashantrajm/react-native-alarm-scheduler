@@ -1,9 +1,21 @@
 {
-  "name": "my-module",
+  "name": "expo-alarm",
   "version": "0.1.0",
   "description": "Native alarm management for Expo apps",
   "main": "build/index.js",
   "types": "build/index.d.ts",
+  "files": [
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "build",
+    "expo-module.config.json",
+    "ios/ExpoAlarm.podspec",
+    "ios/ExpoAlarmModule.swift",
+    "src",
+    "CHANGELOG.md",
+    "README.md"
+  ],
   "scripts": {
     "build": "expo-module build",
     "clean": "expo-module clean",
@@ -18,16 +30,18 @@
   "keywords": [
     "react-native",
     "expo",
-    "my-module",
+    "alarm",
+    "alarmkit",
+    "android-alarmmanager",
     "ExpoAlarm"
   ],
-  "repository": "https://github.com/rajmaurya-dev/my-module",
+  "repository": "https://github.com/rajmaurya-dev/expo-alarm",
   "bugs": {
-    "url": "https://github.com/rajmaurya-dev/my-module/issues"
+    "url": "https://github.com/rajmaurya-dev/expo-alarm/issues"
   },
   "author": "Raj Maurya <63300537+rajmaurya-dev@users.noreply.github.com> (https://github.com/rajmaurya-dev)",
   "license": "MIT",
-  "homepage": "https://github.com/rajmaurya-dev/my-module#readme",
+  "homepage": "https://github.com/rajmaurya-dev/expo-alarm#readme",
   "dependencies": {},
   "devDependencies": {
     "@types/react": "~19.1.1",

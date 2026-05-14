@@ -1,15 +1,55 @@
-import { registerWebModule, NativeModule } from 'expo';
+import { registerWebModule, NativeModule } from "expo";
 
-import { ExpoAlarmModuleEvents } from './ExpoAlarm.types';
+import type {
+  AlarmPermissionResponse,
+  AlarmScheduleInput,
+  ExpoAlarmModuleEvents,
+  ScheduledAlarm,
+} from "./ExpoAlarm.types";
 
 class ExpoAlarmModule extends NativeModule<ExpoAlarmModuleEvents> {
-  PI = Math.PI;
-  async setValueAsync(value: string): Promise<void> {
-    this.emit('onChange', { value });
+  async getPermissionsAsync(): Promise<AlarmPermissionResponse> {
+    return this.unavailablePermission();
   }
-  hello() {
-    return 'Hello world! 👋';
+
+  async requestPermissionsAsync(): Promise<AlarmPermissionResponse> {
+    return this.unavailablePermission();
+  }
+
+  async openAlarmSettingsAsync(): Promise<boolean> {
+    return false;
+  }
+
+  async scheduleAlarmAsync(
+    _alarm: AlarmScheduleInput,
+  ): Promise<ScheduledAlarm> {
+    throw new Error("expo-alarm is only available on Android and iOS.");
+  }
+
+  async cancelAlarmAsync(_id: string): Promise<boolean> {
+    return false;
+  }
+
+  async getScheduledAlarmsAsync(): Promise<ScheduledAlarm[]> {
+    return [];
+  }
+
+  async setSystemAlarmAsync(_alarm: AlarmScheduleInput): Promise<boolean> {
+    throw new Error("System alarms are only available on Android.");
+  }
+
+  async openSystemAlarmAppAsync(): Promise<boolean> {
+    return false;
+  }
+
+  private unavailablePermission(): AlarmPermissionResponse {
+    return {
+      platform: "ios",
+      status: "unavailable",
+      canScheduleExactAlarms: false,
+      canOpenSettings: false,
+    };
   }
 }
 
-export default registerWebModule(ExpoAlarmModule, 'ExpoAlarmModule');
+export default registerWebModule(ExpoAlarmModule, "ExpoAlarm");

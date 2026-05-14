@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "my-module-example",
-    "slug": "my-module-example",
+    "name": "expo-alarm-example",
+    "slug": "expo-alarm-example",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -27,6 +27,14 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "../app.plugin.js",
+        {
+          "alarmKitUsageDescription": "Allow the example app to schedule native alarms."
+        }
+      ]
+    ]
   }
 }

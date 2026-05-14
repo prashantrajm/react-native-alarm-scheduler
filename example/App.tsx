@@ -1,38 +1,54 @@
 import { useEvent } from 'expo';
-import ExpoAlarm, { ExpoAlarmView } from 'my-module';
-import { Button, SafeAreaView, ScrollView, Text, View } from 'react-native';
+import ExpoAlarm from 'expo-alarm';
+import { Button, Platform, SafeAreaView, ScrollView, Text, View } from 'react-native';
 
 export default function App() {
-  const onChangePayload = useEvent(ExpoAlarm, 'onChange');
+  const alarmEvent = useEvent(ExpoAlarm, 'onAlarmTriggered');
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.container}>
-        <Text style={styles.header}>Module API Example</Text>
-        <Group name="Constants">
-          <Text>{ExpoAlarm.PI}</Text>
-        </Group>
-        <Group name="Functions">
-          <Text>{ExpoAlarm.hello()}</Text>
-        </Group>
-        <Group name="Async functions">
+        <Text style={styles.header}>Expo Alarm</Text>
+        <Group name="Permissions">
           <Button
-            title="Set value"
+            title="Check permissions"
             onPress={async () => {
-              await ExpoAlarm.setValueAsync('Hello from JS!');
+              console.log(await ExpoAlarm.getPermissionsAsync());
+            }}
+          />
+          <Button
+            title="Request permissions"
+            onPress={async () => {
+              console.log(await ExpoAlarm.requestPermissionsAsync());
+            }}
+          />
+        </Group>
+        <Group name="Native schedule">
+          <Button
+            title="Schedule alarm for next minute"
+            onPress={async () => {
+              const nextMinute = new Date(Date.now() + 60_000);
+              console.log(await ExpoAlarm.scheduleAlarmAsync({
+                hour: nextMinute.getHours(),
+                minute: nextMinute.getMinutes(),
+                title: 'Expo Alarm example',
+              }));
             }}
           />
         </Group>
         <Group name="Events">
-          <Text>{onChangePayload?.value}</Text>
+          <Text>{alarmEvent ? JSON.stringify(alarmEvent) : 'No alarm event yet'}</Text>
         </Group>
-        <Group name="Views">
-          <ExpoAlarmView
-            url="https://www.example.com"
-            onLoad={({ nativeEvent: { url } }) => console.log(`Loaded: ${url}`)}
-            style={styles.view}
-          />
-        </Group>
+        {Platform.OS === 'android' ? (
+          <Group name="Android Clock">
+            <Button
+              title="Open system alarm app"
+              onPress={async () => {
+                await ExpoAlarm.openSystemAlarmAppAsync();
+              }}
+            />
+          </Group>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -65,9 +81,5 @@ const styles = {
   container: {
     flex: 1,
     backgroundColor: '#eee',
-  },
-  view: {
-    flex: 1,
-    height: 200,
   },
 };

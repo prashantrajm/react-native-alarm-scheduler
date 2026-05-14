@@ -19,7 +19,7 @@ config.resolver.nodeModulesPaths = [
 ];
 
 config.resolver.extraNodeModules = {
-  'my-module': '..',
+  'expo-alarm': '..',
 };
 
 config.watchFolders = [path.resolve(__dirname, '..')];
