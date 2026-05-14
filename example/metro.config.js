@@ -19,7 +19,7 @@ config.resolver.nodeModulesPaths = [
 ];
 
 config.resolver.extraNodeModules = {
-  'expo-alarm': '..',
+  'react-native-alarm-scheduler': '..',
 };
 
 config.watchFolders = [path.resolve(__dirname, '..')];

@@ -1,7 +1,7 @@
 {
-  "name": "expo-alarm",
+  "name": "react-native-alarm-scheduler",
   "version": "0.1.0",
-  "description": "Native alarm management for Expo apps",
+  "description": "Native alarm scheduling for React Native and Expo apps",
   "main": "build/index.js",
   "types": "build/index.d.ts",
   "files": [
@@ -35,7 +35,10 @@
     "android-alarmmanager",
     "ExpoAlarm"
   ],
-  "repository": "https://github.com/rajmaurya-dev/expo-alarm",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rajmaurya-dev/expo-alarm.git"
+  },
   "bugs": {
     "url": "https://github.com/rajmaurya-dev/expo-alarm/issues"
   },

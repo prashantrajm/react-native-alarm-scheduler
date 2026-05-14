@@ -1,8 +1,8 @@
-# expo-alarm
+# react-native-alarm-scheduler
 
-Native alarm management for Expo apps with Android exact alarms and iOS AlarmKit support.
+Native alarm scheduling for React Native and Expo apps with Android exact alarms and iOS AlarmKit support.
 
-`expo-alarm` is an Expo Modules API package for apps that need user-visible alarms, not just delayed background work. It exposes a small TypeScript API for checking alarm permissions, scheduling app-owned alarms, listing/canceling scheduled alarms, and opening native alarm surfaces where the operating system allows it.
+`react-native-alarm-scheduler` is an Expo Modules API package for apps that need user-visible alarms, not just delayed background work. It exposes a small TypeScript API for checking alarm permissions, scheduling app-owned alarms, listing/canceling scheduled alarms, and opening native alarm surfaces where the operating system allows it.
 
 ## Features
 
@@ -10,7 +10,7 @@ Native alarm management for Expo apps with Android exact alarms and iOS AlarmKit
 - Android system Clock integration through `AlarmClock.ACTION_SET_ALARM` and `AlarmClock.ACTION_SHOW_ALARMS`.
 - iOS native alarm scheduling through AlarmKit on iOS 26+.
 - Config plugin for Android permissions and `NSAlarmKitUsageDescription`.
-- Typed TypeScript API for Expo and React Native apps.
+- Typed TypeScript API for React Native and Expo apps.
 - Explicit unsupported behavior for platforms or OS versions that cannot schedule native alarms.
 
 ## Platform support
@@ -28,18 +28,12 @@ Native alarm management for Expo apps with Android exact alarms and iOS AlarmKit
 
 This module uses native code, so it is not available inside Expo Go. Use a development build or a prebuilt native app.
 
+For bare React Native apps, install and configure Expo Modules first, then install this package. Expo apps already include the required runtime.
+
 ## Install
 
-While this repo is not published under your npm account, install it from GitHub:
-
 ```sh
-npm install github:rajmaurya-dev/expo-alarm
-```
-
-After publishing under the final npm package name:
-
-```sh
-npm install expo-alarm
+npm install react-native-alarm-scheduler
 ```
 
 ## Configure
@@ -51,7 +45,7 @@ Add the config plugin to your app config before running `expo prebuild`:
   "expo": {
     "plugins": [
       [
-        "expo-alarm",
+        "react-native-alarm-scheduler",
         {
           "alarmKitUsageDescription": "Allow this app to schedule alarms.",
           "addExactAlarmPermission": true,
@@ -86,7 +80,7 @@ npx expo run:ios
 Schedule an app-owned alarm:
 
 ```ts
-import ExpoAlarm from 'expo-alarm';
+import ExpoAlarm from 'react-native-alarm-scheduler';
 
 const permissions = await ExpoAlarm.requestPermissionsAsync();
 
@@ -262,12 +256,12 @@ npm run ios
 
 ## Publishing
 
-Before publishing, confirm the final npm package name. The unscoped `expo-alarm` package name already exists on npm, so publish under an owned scope or transfer/claim the desired package name.
+The selected package name is `react-native-alarm-scheduler`.
 
 Useful checks:
 
 ```sh
-npm view expo-alarm name version
+npm view react-native-alarm-scheduler name version
 npm whoami
 npm pack --dry-run
 ```

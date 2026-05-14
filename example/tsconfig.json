@@ -3,8 +3,8 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
-      "expo-alarm": ["../src/index"],
-      "expo-alarm/*": ["../src/*"]
+      "react-native-alarm-scheduler": ["../src/index"],
+      "react-native-alarm-scheduler/*": ["../src/*"]
     }
   }
 }

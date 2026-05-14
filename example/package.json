@@ -1,5 +1,5 @@
 {
-  "name": "expo-alarm-example",
+  "name": "react-native-alarm-scheduler-example",
   "version": "1.0.0",
   "main": "index.ts",
   "scripts": {

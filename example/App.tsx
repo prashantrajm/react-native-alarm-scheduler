@@ -1,5 +1,5 @@
 import { useEvent } from 'expo';
-import ExpoAlarm from 'expo-alarm';
+import ExpoAlarm from 'react-native-alarm-scheduler';
 import { Button, Platform, SafeAreaView, ScrollView, Text, View } from 'react-native';
 
 export default function App() {

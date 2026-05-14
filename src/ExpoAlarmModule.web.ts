@@ -23,7 +23,9 @@ class ExpoAlarmModule extends NativeModule<ExpoAlarmModuleEvents> {
   async scheduleAlarmAsync(
     _alarm: AlarmScheduleInput,
   ): Promise<ScheduledAlarm> {
-    throw new Error("expo-alarm is only available on Android and iOS.");
+    throw new Error(
+      "react-native-alarm-scheduler is only available on Android and iOS.",
+    );
   }
 
   async cancelAlarmAsync(_id: string): Promise<boolean> {
