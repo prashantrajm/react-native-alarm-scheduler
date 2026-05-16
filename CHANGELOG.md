@@ -10,6 +10,13 @@
 
 ### 💡 Others
 
+## 0.1.5
+
+### 🎉 New features
+
+- Add iOS `alertActionMode: 'openMissionOnly'` to prefer AlarmKit's secondary-only alert presentation where supported.
+- Expand `getNativeAlarmDebugStateAsync()` with AlarmKit alert/button configuration details.
+
 ## 0.1.4
 
 ### 🐛 Bug fixes

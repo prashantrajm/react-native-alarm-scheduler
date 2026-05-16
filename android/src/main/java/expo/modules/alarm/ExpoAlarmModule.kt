@@ -25,6 +25,7 @@ class AlarmScheduleRecord : Record {
 class IosAlarmOptionsRecord : Record {
   @Field var metadata: Map<String, Any>? = null
   @Field var alertTitle: String? = null
+  @Field var alertActionMode: String? = null
   @Field var stopButtonTitle: String? = null
   @Field var secondaryButtonTitle: String? = null
   @Field var countdownTitle: String? = null
@@ -112,7 +113,14 @@ class ExpoAlarmModule : Module() {
         "isComplete" to false,
         "activeRetryAlarmIds" to emptyList<String>(),
         "pendingActions" to emptyList<Map<String, Any>>(),
-        "currentContext" to null
+        "currentContext" to null,
+        "alertActionMode" to "default",
+        "stopButtonIncluded" to false,
+        "secondaryButtonIncluded" to false,
+        "secondaryButtonBehavior" to "none",
+        "stopIntentBehavior" to "recordOnly",
+        "alertInitializer" to "legacyStopButton",
+        "runtimeSupportsSecondaryOnlyAlert" to false
       )
     }
 

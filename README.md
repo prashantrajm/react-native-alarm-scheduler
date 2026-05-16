@@ -108,9 +108,9 @@ if (permissions.canScheduleExactAlarms) {
         mission: 'math',
       },
       alertTitle: 'Morning alarm',
-      stopButtonTitle: 'Stop',
+      alertActionMode: 'openMissionOnly',
       secondaryButtonTitle: 'Open Mission',
-      stopIntentBehavior: 'openApp',
+      stopIntentBehavior: 'rescheduleImmediate',
       secondaryButtonBehavior: 'openApp',
     },
   });
@@ -192,6 +192,7 @@ type AlarmScheduleInput = {
   ios?: {
     metadata?: Record<string, string | number | boolean>;
     alertTitle?: string;
+    alertActionMode?: 'default' | 'openMissionOnly';
     stopButtonTitle?: string;
     secondaryButtonTitle?: string;
     countdownTitle?: string;
@@ -223,10 +224,12 @@ Notes:
 - iOS AlarmKit requires `id` to be a UUID string when you provide one.
 - `ios.metadata` is stored by the package and included in AlarmKit metadata. The package always adds `alarmId` and `title`.
 - iOS presentation options customize AlarmKit text only. They are not Android-style launch intents and do not force a React Native route.
+- `ios.alertActionMode: 'openMissionOnly'` prefers AlarmKit's newer secondary-only alert presentation when the runtime supports it. This omits the package-configured stop button and makes the secondary button the visible app action.
 - `ios.stopIntentBehavior: 'recordOnly'` installs a built-in AlarmKit App Intent that records a `nativeStop` action when the system stop control is pressed.
 - `ios.stopIntentBehavior: 'openApp'` records `nativeStop` and asks iOS to foreground the app immediately. The action record includes `foregroundRequested: true`; iOS does not provide a reliable success callback to the package.
 - `ios.stopIntentBehavior: 'rescheduleImmediate'` records `nativeStop`, asks iOS to foreground the app, and attempts to schedule a retry alarm for the next available minute until JS calls `completeNativeAlarmAsync(alarmId)` or `clearBypassAsync(alarmId)`. Retry alarms use fresh native UUID ids while keeping the original logical `alarmId` in metadata.
 - `ios.secondaryButtonBehavior: 'openApp'` installs a built-in AlarmKit App Intent that records `secondaryOpen` and asks iOS to open the app. Use `recordOnly` to record without foregrounding, or `none` to omit the secondary intent.
+- AlarmKit may still expose system-owned close/stop affordances that do not invoke package App Intents. Use `getNativeAlarmDebugStateAsync(alarmId)` to inspect which alert initializer and buttons were used, and treat strict mission enforcement as limited by public AlarmKit APIs.
 
 ### `cancelAlarmAsync(id)`
 
@@ -296,8 +299,17 @@ type NativeAlarmDebugState = {
   activeRetryAlarmIds: string[];
   pendingActions: AlarmAction[];
   currentContext: AlarmContext | null;
+  alertActionMode?: 'default' | 'openMissionOnly';
+  stopButtonIncluded?: boolean;
+  secondaryButtonIncluded?: boolean;
+  secondaryButtonBehavior?: 'openApp' | 'recordOnly' | 'none';
+  stopIntentBehavior?: 'recordOnly' | 'openApp' | 'rescheduleImmediate';
+  alertInitializer?: 'secondaryOnly' | 'legacyStopButton';
+  runtimeSupportsSecondaryOnlyAlert?: boolean;
 };
 ```
+
+If `alertActionMode` is `openMissionOnly` but `alertInitializer` is `legacyStopButton`, the runtime required the legacy stop-button presentation and the package cannot remove that AlarmKit stop affordance.
 
 ### `setSystemAlarmAsync(alarm)`
 

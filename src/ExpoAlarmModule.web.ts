@@ -64,6 +64,13 @@ class ExpoAlarmModule extends NativeModule<ExpoAlarmModuleEvents> {
       activeRetryAlarmIds: [],
       pendingActions: [],
       currentContext: null,
+      alertActionMode: "default",
+      stopButtonIncluded: false,
+      secondaryButtonIncluded: false,
+      secondaryButtonBehavior: "none",
+      stopIntentBehavior: "recordOnly",
+      alertInitializer: "legacyStopButton",
+      runtimeSupportsSecondaryOnlyAlert: false,
     };
   }
 

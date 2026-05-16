@@ -22,6 +22,7 @@ struct AlarmScheduleRecord: Record {
 struct IosAlarmOptionsRecord: Record {
   @Field var metadata: [String: Any]?
   @Field var alertTitle: String?
+  @Field var alertActionMode: String?
   @Field var stopButtonTitle: String?
   @Field var secondaryButtonTitle: String?
   @Field var countdownTitle: String?
@@ -134,6 +135,12 @@ private struct ExpoAlarmMetadata: AlarmMetadata {
   let alarmId: String
   let title: String
   let values: [String: ExpoAlarmMetadataValue]
+}
+
+@available(iOS 26.0, *)
+private struct ExpoAlarmAlertPresentationResult {
+  let alert: AlarmPresentation.Alert
+  let debugState: [String: Any]
 }
 
 private enum ExpoAlarmMetadataValue: Codable, Hashable, Sendable {
@@ -430,13 +437,20 @@ public class ExpoAlarmModule: Module {
     }
 
     AsyncFunction("getNativeAlarmDebugStateAsync") { (alarmId: String) -> [String: Any] in
-      return [
+      var state: [String: Any] = [
         "alarmId": alarmId,
         "isComplete": ExpoAlarmNativeAlarmStore.isComplete(alarmId: alarmId),
         "activeRetryAlarmIds": ExpoAlarmNativeAlarmStore.retryAlarmIds(for: alarmId),
         "pendingActions": ExpoAlarmNativeAlarmStore.all().filter { ($0["alarmId"] as? String) == alarmId },
         "currentContext": self.currentAlarmContext() as Any
       ]
+      if let storedAlarm = self.storedAlarms().first(where: { ($0["id"] as? String) == alarmId }),
+        let alarmKitDebugState = storedAlarm["alarmKitDebugState"] as? [String: Any] {
+        alarmKitDebugState.forEach { key, value in
+          state[key] = value
+        }
+      }
+      return state
     }
 
     AsyncFunction("setSystemAlarmAsync") { (_: AlarmScheduleRecord) throws -> Bool in
@@ -564,10 +578,11 @@ public class ExpoAlarmModule: Module {
     let metadata = normalizeMetadata(alarm.ios?.metadata, id: id, title: title)
     let timestamp = alarm.timestamp.flatMap { $0 > Date().timeIntervalSince1970 * 1000 ? Int64($0) : nil }
       ?? nextTriggerTimestamp(hour: hour, minute: minute, weekdays: weekdays)
+    var alarmKitDebugState: [String: Any]?
 
     #if canImport(AlarmKit)
     if #available(iOS 26.0, *) {
-      try await scheduleAlarmKit(id: id, title: title, hour: hour, minute: minute, weekdays: weekdays, options: alarm.ios, metadata: metadata)
+      alarmKitDebugState = try await scheduleAlarmKit(id: id, title: title, hour: hour, minute: minute, weekdays: weekdays, options: alarm.ios, metadata: metadata)
     } else {
       throw UnsupportedAlarmException("AlarmKit requires iOS 26 or newer.")
     }
@@ -575,7 +590,7 @@ public class ExpoAlarmModule: Module {
     throw UnsupportedAlarmException("This build was compiled without AlarmKit. Build with the iOS 26 SDK or newer to schedule native iOS alarms.")
     #endif
 
-    let stored: [String: Any] = [
+    var stored: [String: Any] = [
       "id": id,
       "hour": hour,
       "minute": minute,
@@ -585,6 +600,9 @@ public class ExpoAlarmModule: Module {
       "platform": "ios",
       "metadata": metadata
     ]
+    if let alarmKitDebugState {
+      stored["alarmKitDebugState"] = alarmKitDebugState
+    }
     save(alarm: stored)
     return stored
   }
@@ -675,27 +693,33 @@ public class ExpoAlarmModule: Module {
     weekdays: [Int],
     options: IosAlarmOptionsRecord?,
     metadata: [String: Any]
-  ) async throws {
+  ) async throws -> [String: Any] {
     guard let alarmID = UUID(uuidString: id) else {
       throw InvalidAlarmException("Alarm id must be a UUID string on iOS.")
     }
 
     let alertTitle = options?.alertTitle?.isEmpty == false ? options!.alertTitle! : title
+    let alertActionMode = normalizeAlertActionMode(options?.alertActionMode)
     let stopButtonTitle = options?.stopButtonTitle?.isEmpty == false ? options!.stopButtonTitle! : "Stop"
-    let secondaryButtonTitle = options?.secondaryButtonTitle?.isEmpty == false ? options!.secondaryButtonTitle! : nil
+    let secondaryButtonTitle = options?.secondaryButtonTitle?.isEmpty == false
+      ? options!.secondaryButtonTitle!
+      : (alertActionMode == "openMissionOnly" ? "Open Mission" : nil)
     let countdownTitle = options?.countdownTitle?.isEmpty == false ? options!.countdownTitle! : nil
     let secondaryButtonBehavior = normalizeSecondaryButtonBehavior(options?.secondaryButtonBehavior, hasSecondaryButton: secondaryButtonTitle != nil)
     let secondaryButton = secondaryButtonTitle.map {
       AlarmButton(text: LocalizedStringResource(stringLiteral: $0), textColor: .white, systemImageName: "app.badge")
     }
-    let alert = makeAlertPresentation(
+    let alertPresentation = makeAlertPresentation(
       title: alertTitle,
+      alertActionMode: alertActionMode,
       stopButtonTitle: stopButtonTitle,
       secondaryButton: secondaryButton,
-      secondaryButtonBehavior: secondaryButtonBehavior
+      secondaryButtonBehavior: secondaryButtonBehavior,
+      stopIntentBehavior: normalizeStopIntentBehavior(options?.stopIntentBehavior),
+      secondaryButtonBehaviorName: normalizeSecondaryButtonBehaviorName(options?.secondaryButtonBehavior, hasSecondaryButton: secondaryButtonTitle != nil)
     )
     let presentation = AlarmPresentation(
-      alert: alert,
+      alert: alertPresentation.alert,
       countdown: countdownTitle.map { AlarmPresentation.Countdown(title: LocalizedStringResource(stringLiteral: $0)) }
     )
     let attributes = AlarmAttributes(
@@ -710,7 +734,7 @@ public class ExpoAlarmModule: Module {
       hour: hour,
       minute: minute,
       weekdays: weekdays,
-      behavior: options?.stopIntentBehavior
+      behavior: normalizeStopIntentBehavior(options?.stopIntentBehavior)
     )
     let secondaryIntent = makeSecondaryIntent(id: id, behavior: options?.secondaryButtonBehavior)
     _ = try await AlarmManager.shared.schedule(
@@ -722,28 +746,92 @@ public class ExpoAlarmModule: Module {
         secondaryIntent: secondaryIntent
       )
     )
+    return alertPresentation.debugState
   }
 
   @available(iOS 26.0, *)
   private func makeAlertPresentation(
     title: String,
+    alertActionMode: String,
     stopButtonTitle: String,
     secondaryButton: AlarmButton?,
-    secondaryButtonBehavior: AlarmPresentation.Alert.SecondaryButtonBehavior?
-  ) -> AlarmPresentation.Alert {
+    secondaryButtonBehavior: AlarmPresentation.Alert.SecondaryButtonBehavior?,
+    stopIntentBehavior: String,
+    secondaryButtonBehaviorName: String
+  ) -> ExpoAlarmAlertPresentationResult {
+    let runtimeSupportsSecondaryOnlyAlert: Bool
     if #available(iOS 26.1, *) {
-      return AlarmPresentation.Alert(
+      runtimeSupportsSecondaryOnlyAlert = true
+    } else {
+      runtimeSupportsSecondaryOnlyAlert = false
+    }
+    let shouldUseSecondaryOnly = alertActionMode == "openMissionOnly" && runtimeSupportsSecondaryOnlyAlert
+    let debugState: [String: Any] = [
+      "alertActionMode": alertActionMode,
+      "stopButtonIncluded": !shouldUseSecondaryOnly,
+      "secondaryButtonIncluded": secondaryButton != nil,
+      "secondaryButtonBehavior": secondaryButtonBehaviorName,
+      "stopIntentBehavior": stopIntentBehavior,
+      "alertInitializer": shouldUseSecondaryOnly ? "secondaryOnly" : "legacyStopButton",
+      "runtimeSupportsSecondaryOnlyAlert": runtimeSupportsSecondaryOnlyAlert
+    ]
+    if alertActionMode == "openMissionOnly" {
+      if #available(iOS 26.1, *) {
+        return ExpoAlarmAlertPresentationResult(
+          alert: AlarmPresentation.Alert(
+            title: LocalizedStringResource(stringLiteral: title),
+            secondaryButton: secondaryButton,
+            secondaryButtonBehavior: secondaryButtonBehavior
+          ),
+          debugState: debugState
+        )
+      }
+    }
+    return ExpoAlarmAlertPresentationResult(
+      alert: AlarmPresentation.Alert(
         title: LocalizedStringResource(stringLiteral: title),
+        stopButton: AlarmButton(text: LocalizedStringResource(stringLiteral: stopButtonTitle), textColor: .white, systemImageName: "stop.fill"),
         secondaryButton: secondaryButton,
         secondaryButtonBehavior: secondaryButtonBehavior
-      )
-    }
-    return AlarmPresentation.Alert(
-      title: LocalizedStringResource(stringLiteral: title),
-      stopButton: AlarmButton(text: LocalizedStringResource(stringLiteral: stopButtonTitle), textColor: .white, systemImageName: "stop.fill"),
-      secondaryButton: secondaryButton,
-      secondaryButtonBehavior: secondaryButtonBehavior
+      ),
+      debugState: debugState
     )
+  }
+
+  @available(iOS 26.0, *)
+  private func normalizeAlertActionMode(_ mode: String?) -> String {
+    switch mode ?? "default" {
+    case "openMissionOnly":
+      return "openMissionOnly"
+    default:
+      return "default"
+    }
+  }
+
+  @available(iOS 26.0, *)
+  private func normalizeStopIntentBehavior(_ behavior: String?) -> String {
+    switch behavior ?? "recordOnly" {
+    case "recordOnly", "openApp", "rescheduleImmediate":
+      return behavior ?? "recordOnly"
+    default:
+      return "recordOnly"
+    }
+  }
+
+  @available(iOS 26.0, *)
+  private func normalizeSecondaryButtonBehaviorName(
+    _ behavior: String?,
+    hasSecondaryButton: Bool
+  ) -> String {
+    guard hasSecondaryButton else {
+      return "none"
+    }
+    switch behavior ?? "openApp" {
+    case "openApp", "recordOnly", "none":
+      return behavior ?? "openApp"
+    default:
+      return "openApp"
+    }
   }
 
   @available(iOS 26.0, *)

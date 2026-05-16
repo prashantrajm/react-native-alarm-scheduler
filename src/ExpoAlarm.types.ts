@@ -27,6 +27,7 @@ export type AlarmMetadata = Record<string, AlarmMetadataValue>;
 export type IosAlarmOptions = {
   metadata?: AlarmMetadata;
   alertTitle?: string;
+  alertActionMode?: "default" | "openMissionOnly";
   stopButtonTitle?: string;
   secondaryButtonTitle?: string;
   countdownTitle?: string;
@@ -98,4 +99,11 @@ export type NativeAlarmDebugState = {
   activeRetryAlarmIds: string[];
   pendingActions: AlarmAction[];
   currentContext: AlarmContext | null;
+  alertActionMode?: "default" | "openMissionOnly";
+  stopButtonIncluded?: boolean;
+  secondaryButtonIncluded?: boolean;
+  secondaryButtonBehavior?: "openApp" | "recordOnly" | "none";
+  stopIntentBehavior?: "recordOnly" | "openApp" | "rescheduleImmediate";
+  alertInitializer?: "secondaryOnly" | "legacyStopButton";
+  runtimeSupportsSecondaryOnlyAlert?: boolean;
 };
