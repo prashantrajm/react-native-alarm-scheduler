@@ -10,6 +10,13 @@
 
 ### 💡 Others
 
+## 0.1.4
+
+### 🐛 Bug fixes
+
+- Fix iOS `rescheduleImmediate` retry alarms by generating valid UUID retry alarm ids.
+- Move iOS retry scheduling far enough ahead to target the next available minute.
+
 ## 0.1.3
 
 ### 🎉 New features

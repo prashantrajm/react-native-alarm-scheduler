@@ -48,6 +48,7 @@ export type AlarmAction = {
   foregroundRequested?: boolean;
   rescheduled?: boolean;
   rescheduledAlarmId?: string;
+  retryScheduledFor?: number;
 };
 
 export type AlarmScheduleInput = {
@@ -89,4 +90,12 @@ export type AlarmStateChange = {
   state: AlarmContextState;
   timestamp: number;
   metadata?: AlarmMetadata;
+};
+
+export type NativeAlarmDebugState = {
+  alarmId: string;
+  isComplete: boolean;
+  activeRetryAlarmIds: string[];
+  pendingActions: AlarmAction[];
+  currentContext: AlarmContext | null;
 };

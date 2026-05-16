@@ -32,6 +32,7 @@ struct IosAlarmOptionsRecord: Record {
 private enum ExpoAlarmNativeAlarmStore {
   private static let actionsKey = "expo_alarm_actions"
   private static let completionsKey = "expo_alarm_completed_ids"
+  private static let retryIdsKey = "expo_alarm_retry_ids_by_alarm"
   static let actionRecordedNotification = Notification.Name("expo.modules.alarm.actionRecorded")
 
   static func all() -> [[String: Any]] {
@@ -75,13 +76,20 @@ private enum ExpoAlarmNativeAlarmStore {
     UserDefaults.standard.set(remaining, forKey: actionsKey)
   }
 
+  static func clearActions(alarmId: String) {
+    let remaining = all().filter { action in
+      action["alarmId"] as? String != alarmId
+    }
+    UserDefaults.standard.set(remaining, forKey: actionsKey)
+  }
+
   static func complete(alarmId: String) {
     var ids = completedAlarmIds()
     ids.insert(alarmId)
     UserDefaults.standard.set(Array(ids), forKey: completionsKey)
   }
 
-  static func clearBypass(alarmId: String) {
+  static func resetCompletion(alarmId: String) {
     var ids = completedAlarmIds()
     ids.remove(alarmId)
     UserDefaults.standard.set(Array(ids), forKey: completionsKey)
@@ -93,6 +101,30 @@ private enum ExpoAlarmNativeAlarmStore {
 
   private static func completedAlarmIds() -> Set<String> {
     Set(UserDefaults.standard.stringArray(forKey: completionsKey) ?? [])
+  }
+
+  static func addRetryAlarmId(_ retryAlarmId: String, for alarmId: String) {
+    var allRetryIds = retryIdsByAlarmId()
+    var ids = allRetryIds[alarmId] ?? []
+    if !ids.contains(retryAlarmId) {
+      ids.append(retryAlarmId)
+    }
+    allRetryIds[alarmId] = ids
+    UserDefaults.standard.set(allRetryIds, forKey: retryIdsKey)
+  }
+
+  static func retryAlarmIds(for alarmId: String) -> [String] {
+    retryIdsByAlarmId()[alarmId] ?? []
+  }
+
+  static func clearRetryAlarmIds(for alarmId: String) {
+    var allRetryIds = retryIdsByAlarmId()
+    allRetryIds.removeValue(forKey: alarmId)
+    UserDefaults.standard.set(allRetryIds, forKey: retryIdsKey)
+  }
+
+  private static func retryIdsByAlarmId() -> [String: [String]] {
+    UserDefaults.standard.dictionary(forKey: retryIdsKey) as? [String: [String]] ?? [:]
   }
 }
 
@@ -176,8 +208,8 @@ private struct ExpoAlarmStopIntent: LiveActivityIntent {
       "foregroundRequested": true
     ]
     if shouldReschedule {
-      let rescheduledAlarmId = "\(alarmId)-retry-\(Int64(Date().timeIntervalSince1970 * 1000))"
-      let didReschedule = await ExpoAlarmRescheduler.scheduleImmediate(
+      let rescheduledAlarmId = UUID().uuidString
+      let retryScheduledFor = await ExpoAlarmRescheduler.scheduleImmediate(
         id: rescheduledAlarmId,
         originalAlarmId: alarmId,
         title: alarmTitle,
@@ -185,8 +217,11 @@ private struct ExpoAlarmStopIntent: LiveActivityIntent {
         minute: minute,
         weekdays: ExpoAlarmRescheduler.decodeWeekdays(weekdays)
       )
-      details["rescheduled"] = didReschedule
+      details["rescheduled"] = retryScheduledFor != nil
       details["rescheduledAlarmId"] = rescheduledAlarmId
+      if let retryScheduledFor {
+        details["retryScheduledFor"] = retryScheduledFor
+      }
     }
     _ = ExpoAlarmNativeAlarmStore.record(alarmId: alarmId, action: "nativeStop", details: details)
     return .result()
@@ -255,11 +290,12 @@ private enum ExpoAlarmRescheduler {
     hour: Int,
     minute: Int,
     weekdays: [Int]
-  ) async -> Bool {
+  ) async -> Int64? {
     guard let alarmID = UUID(uuidString: id) else {
-      return false
+      return nil
     }
-    let now = Date().addingTimeInterval(8)
+    let now = Date().addingTimeInterval(70)
+    let retryScheduledFor = Int64(now.timeIntervalSince1970 * 1000)
     let components = Calendar.current.dateComponents([.hour, .minute], from: now)
     let retryHour = components.hour ?? hour
     let retryMinute = components.minute ?? minute
@@ -297,9 +333,10 @@ private enum ExpoAlarmRescheduler {
           )
         )
       )
-      return true
+      ExpoAlarmNativeAlarmStore.addRetryAlarmId(id, for: originalAlarmId)
+      return retryScheduledFor
     } catch {
-      return false
+      return nil
     }
   }
 
@@ -378,12 +415,28 @@ public class ExpoAlarmModule: Module {
       ExpoAlarmNativeAlarmStore.clear(ids: ids)
     }
 
-    AsyncFunction("completeNativeAlarmAsync") { (alarmId: String) -> Void in
+    AsyncFunction("completeNativeAlarmAsync") { (alarmId: String) async -> Void in
       ExpoAlarmNativeAlarmStore.complete(alarmId: alarmId)
+      await self.cancelNativeAndRetryAlarms(originalAlarmId: alarmId)
+      ExpoAlarmNativeAlarmStore.clearActions(alarmId: alarmId)
     }
 
     AsyncFunction("clearBypassAsync") { (alarmId: String) -> Void in
-      ExpoAlarmNativeAlarmStore.clearBypass(alarmId: alarmId)
+      ExpoAlarmNativeAlarmStore.resetCompletion(alarmId: alarmId)
+    }
+
+    AsyncFunction("resetNativeAlarmCompletionAsync") { (alarmId: String) -> Void in
+      ExpoAlarmNativeAlarmStore.resetCompletion(alarmId: alarmId)
+    }
+
+    AsyncFunction("getNativeAlarmDebugStateAsync") { (alarmId: String) -> [String: Any] in
+      return [
+        "alarmId": alarmId,
+        "isComplete": ExpoAlarmNativeAlarmStore.isComplete(alarmId: alarmId),
+        "activeRetryAlarmIds": ExpoAlarmNativeAlarmStore.retryAlarmIds(for: alarmId),
+        "pendingActions": ExpoAlarmNativeAlarmStore.all().filter { ($0["alarmId"] as? String) == alarmId },
+        "currentContext": self.currentAlarmContext() as Any
+      ]
     }
 
     AsyncFunction("setSystemAlarmAsync") { (_: AlarmScheduleRecord) throws -> Bool in
@@ -550,6 +603,23 @@ public class ExpoAlarmModule: Module {
 
     let didRemoveStoredAlarm = remove(id: id)
     return didCancelNativeAlarm || didRemoveStoredAlarm
+  }
+
+  private func cancelNativeAndRetryAlarms(originalAlarmId: String) async {
+    #if canImport(AlarmKit)
+    if #available(iOS 26.0, *) {
+      if let uuid = UUID(uuidString: originalAlarmId) {
+        try? AlarmManager.shared.cancel(id: uuid)
+      }
+      for retryAlarmId in ExpoAlarmNativeAlarmStore.retryAlarmIds(for: originalAlarmId) {
+        guard let uuid = UUID(uuidString: retryAlarmId) else {
+          continue
+        }
+        try? AlarmManager.shared.cancel(id: uuid)
+      }
+      ExpoAlarmNativeAlarmStore.clearRetryAlarmIds(for: originalAlarmId)
+    }
+    #endif
   }
 
   private func currentAlarmContext() -> [String: Any]? {

@@ -102,6 +102,20 @@ class ExpoAlarmModule : Module() {
       null
     }
 
+    AsyncFunction("resetNativeAlarmCompletionAsync") { _: String ->
+      null
+    }
+
+    AsyncFunction("getNativeAlarmDebugStateAsync") { alarmId: String ->
+      mapOf(
+        "alarmId" to alarmId,
+        "isComplete" to false,
+        "activeRetryAlarmIds" to emptyList<String>(),
+        "pendingActions" to emptyList<Map<String, Any>>(),
+        "currentContext" to null
+      )
+    }
+
     AsyncFunction("setSystemAlarmAsync") { alarm: AlarmScheduleRecord ->
       val context = requireContext()
       val hour = ExpoAlarmScheduler.requireHour(alarm.hour)

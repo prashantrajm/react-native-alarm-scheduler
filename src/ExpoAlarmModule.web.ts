@@ -6,6 +6,7 @@ import type {
   AlarmContext,
   AlarmScheduleInput,
   ExpoAlarmModuleEvents,
+  NativeAlarmDebugState,
   ScheduledAlarm,
 } from "./ExpoAlarm.types";
 
@@ -51,6 +52,20 @@ class ExpoAlarmModule extends NativeModule<ExpoAlarmModuleEvents> {
   async completeNativeAlarmAsync(_alarmId: string): Promise<void> {}
 
   async clearBypassAsync(_alarmId: string): Promise<void> {}
+
+  async resetNativeAlarmCompletionAsync(_alarmId: string): Promise<void> {}
+
+  async getNativeAlarmDebugStateAsync(
+    alarmId: string,
+  ): Promise<NativeAlarmDebugState> {
+    return {
+      alarmId,
+      isComplete: false,
+      activeRetryAlarmIds: [],
+      pendingActions: [],
+      currentContext: null,
+    };
+  }
 
   async setSystemAlarmAsync(_alarm: AlarmScheduleInput): Promise<boolean> {
     throw new Error("System alarms are only available on Android.");

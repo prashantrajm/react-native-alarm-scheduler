@@ -6,6 +6,7 @@ import type {
   AlarmContext,
   AlarmScheduleInput,
   ExpoAlarmModuleEvents,
+  NativeAlarmDebugState,
   ScheduledAlarm,
 } from "./ExpoAlarm.types";
 
@@ -21,6 +22,10 @@ declare class ExpoAlarmModule extends NativeModule<ExpoAlarmModuleEvents> {
   clearPendingAlarmActionsAsync(ids?: string[]): Promise<void>;
   completeNativeAlarmAsync(alarmId: string): Promise<void>;
   clearBypassAsync(alarmId: string): Promise<void>;
+  resetNativeAlarmCompletionAsync(alarmId: string): Promise<void>;
+  getNativeAlarmDebugStateAsync(
+    alarmId: string,
+  ): Promise<NativeAlarmDebugState>;
   setSystemAlarmAsync(alarm: AlarmScheduleInput): Promise<boolean>;
   openSystemAlarmAppAsync(): Promise<boolean>;
 }

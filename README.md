@@ -225,7 +225,7 @@ Notes:
 - iOS presentation options customize AlarmKit text only. They are not Android-style launch intents and do not force a React Native route.
 - `ios.stopIntentBehavior: 'recordOnly'` installs a built-in AlarmKit App Intent that records a `nativeStop` action when the system stop control is pressed.
 - `ios.stopIntentBehavior: 'openApp'` records `nativeStop` and asks iOS to foreground the app immediately. The action record includes `foregroundRequested: true`; iOS does not provide a reliable success callback to the package.
-- `ios.stopIntentBehavior: 'rescheduleImmediate'` records `nativeStop`, asks iOS to foreground the app, and attempts to schedule an immediate retry alarm until JS calls `completeNativeAlarmAsync(alarmId)` or `clearBypassAsync(alarmId)`. AlarmKit schedules alarms by time components, so iOS may coerce this to the next available minute instead of exact seconds.
+- `ios.stopIntentBehavior: 'rescheduleImmediate'` records `nativeStop`, asks iOS to foreground the app, and attempts to schedule a retry alarm for the next available minute until JS calls `completeNativeAlarmAsync(alarmId)` or `clearBypassAsync(alarmId)`. Retry alarms use fresh native UUID ids while keeping the original logical `alarmId` in metadata.
 - `ios.secondaryButtonBehavior: 'openApp'` installs a built-in AlarmKit App Intent that records `secondaryOpen` and asks iOS to open the app. Use `recordOnly` to record without foregrounding, or `none` to omit the secondary intent.
 
 ### `cancelAlarmAsync(id)`
@@ -263,6 +263,7 @@ type AlarmAction = {
   foregroundRequested?: boolean;
   rescheduled?: boolean;
   rescheduledAlarmId?: string;
+  retryScheduledFor?: number;
 };
 ```
 
@@ -274,11 +275,29 @@ Clears pending native action records. Pass action record `id` values to clear sp
 
 ### `completeNativeAlarmAsync(alarmId)`
 
-Marks the native alarm flow complete for `rescheduleImmediate`. Call this only after the user satisfies your app's mission. This stops future native stop intents from scheduling retry alarms for that `alarmId`.
+Marks the native alarm flow complete for `rescheduleImmediate`. Call this only after the user satisfies your app's mission. This stops future native stop intents from scheduling retry alarms for that `alarmId`, cancels the original native alarm when active, cancels retry alarms tracked for that logical alarm id, and clears pending native action records for that alarm.
 
 ### `clearBypassAsync(alarmId)`
 
-Clears the completion marker for an alarm id, allowing `rescheduleImmediate` retries again for that alarm id.
+Clears the completion marker for an alarm id, allowing `rescheduleImmediate` retries again for that alarm id. Prefer `resetNativeAlarmCompletionAsync(alarmId)` for clearer naming.
+
+### `resetNativeAlarmCompletionAsync(alarmId)`
+
+Alias for `clearBypassAsync(alarmId)` with clearer semantics.
+
+### `getNativeAlarmDebugStateAsync(alarmId)`
+
+Returns native retry/debug state:
+
+```ts
+type NativeAlarmDebugState = {
+  alarmId: string;
+  isComplete: boolean;
+  activeRetryAlarmIds: string[];
+  pendingActions: AlarmAction[];
+  currentContext: AlarmContext | null;
+};
+```
 
 ### `setSystemAlarmAsync(alarm)`
 
