@@ -19,6 +19,15 @@ class AlarmScheduleRecord : Record {
   @Field var weekdays: List<Int>? = null
   @Field var timestamp: Double? = null
   @Field var showUi: Boolean = false
+  @Field var ios: IosAlarmOptionsRecord? = null
+}
+
+class IosAlarmOptionsRecord : Record {
+  @Field var metadata: Map<String, Any>? = null
+  @Field var alertTitle: String? = null
+  @Field var stopButtonTitle: String? = null
+  @Field var secondaryButtonTitle: String? = null
+  @Field var countdownTitle: String? = null
 }
 
 class ExpoAlarmModule : Module() {
@@ -69,6 +78,10 @@ class ExpoAlarmModule : Module() {
 
     AsyncFunction("getScheduledAlarmsAsync") {
       ExpoAlarmScheduler.getAll(requireContext())
+    }
+
+    AsyncFunction("getCurrentAlarmContextAsync") {
+      null
     }
 
     AsyncFunction("setSystemAlarmAsync") { alarm: AlarmScheduleRecord ->

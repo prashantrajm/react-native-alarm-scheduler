@@ -32,7 +32,20 @@ export default function App() {
                 hour: nextMinute.getHours(),
                 minute: nextMinute.getMinutes(),
                 title: 'Expo Alarm example',
+                ios: {
+                  metadata: {
+                    mission: 'example',
+                  },
+                  alertTitle: 'Expo Alarm example',
+                  stopButtonTitle: 'Open Mission',
+                },
               }));
+            }}
+          />
+          <Button
+            title="Read current alarm context"
+            onPress={async () => {
+              console.log(await ExpoAlarm.getCurrentAlarmContextAsync());
             }}
           />
         </Group>

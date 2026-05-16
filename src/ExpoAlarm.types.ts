@@ -18,6 +18,18 @@ export type ExpoAlarmModuleEvents = {
 
 export type AlarmWeekday = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
+export type AlarmMetadataValue = string | number | boolean;
+
+export type AlarmMetadata = Record<string, AlarmMetadataValue>;
+
+export type IosAlarmOptions = {
+  metadata?: AlarmMetadata;
+  alertTitle?: string;
+  stopButtonTitle?: string;
+  secondaryButtonTitle?: string;
+  countdownTitle?: string;
+};
+
 export type AlarmScheduleInput = {
   id?: string;
   hour: number;
@@ -26,6 +38,7 @@ export type AlarmScheduleInput = {
   weekdays?: AlarmWeekday[];
   timestamp?: number;
   showUi?: boolean;
+  ios?: IosAlarmOptions;
 };
 
 export type ScheduledAlarm = {
@@ -36,4 +49,17 @@ export type ScheduledAlarm = {
   weekdays: AlarmWeekday[];
   timestamp: number;
   platform: "android" | "ios";
+  metadata?: AlarmMetadata;
+};
+
+export type AlarmContextState =
+  | "scheduled"
+  | "alerting"
+  | "countdown"
+  | "paused";
+
+export type AlarmContext = {
+  id: string;
+  metadata?: AlarmMetadata;
+  state?: AlarmContextState;
 };

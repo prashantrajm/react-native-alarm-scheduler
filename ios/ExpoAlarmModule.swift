@@ -15,12 +15,52 @@ struct AlarmScheduleRecord: Record {
   @Field var weekdays: [Int]?
   @Field var timestamp: Double?
   @Field var showUi: Bool = false
+  @Field var ios: IosAlarmOptionsRecord?
+}
+
+struct IosAlarmOptionsRecord: Record {
+  @Field var metadata: [String: Any]?
+  @Field var alertTitle: String?
+  @Field var stopButtonTitle: String?
+  @Field var secondaryButtonTitle: String?
+  @Field var countdownTitle: String?
 }
 
 #if canImport(AlarmKit)
 @available(iOS 26.0, *)
 private struct ExpoAlarmMetadata: AlarmMetadata {
+  let alarmId: String
   let title: String
+  let values: [String: ExpoAlarmMetadataValue]
+}
+
+private enum ExpoAlarmMetadataValue: Codable, Hashable, Sendable {
+  case string(String)
+  case number(Double)
+  case bool(Bool)
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    if let value = try? container.decode(Bool.self) {
+      self = .bool(value)
+    } else if let value = try? container.decode(Double.self) {
+      self = .number(value)
+    } else {
+      self = .string(try container.decode(String.self))
+    }
+  }
+
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    switch self {
+    case .string(let value):
+      try container.encode(value)
+    case .number(let value):
+      try container.encode(value)
+    case .bool(let value):
+      try container.encode(value)
+    }
+  }
 }
 #endif
 
@@ -65,6 +105,10 @@ public class ExpoAlarmModule: Module {
       return self.storedAlarms()
     }
 
+    AsyncFunction("getCurrentAlarmContextAsync") { () -> [String: Any]? in
+      return self.currentAlarmContext()
+    }
+
     AsyncFunction("setSystemAlarmAsync") { (_: AlarmScheduleRecord) throws -> Bool in
       throw UnsupportedAlarmException("iOS does not expose the Clock app alarm list through a public API. Use scheduleAlarmAsync on iOS 26+.")
     }
@@ -107,12 +151,13 @@ public class ExpoAlarmModule: Module {
     let minute = try requireMinute(alarm.minute)
     let title = alarm.title?.isEmpty == false ? alarm.title! : "Alarm"
     let weekdays = try normalizeWeekdays(alarm.weekdays)
+    let metadata = normalizeMetadata(alarm.ios?.metadata, id: id, title: title)
     let timestamp = alarm.timestamp.flatMap { $0 > Date().timeIntervalSince1970 * 1000 ? Int64($0) : nil }
       ?? nextTriggerTimestamp(hour: hour, minute: minute, weekdays: weekdays)
 
     #if canImport(AlarmKit)
     if #available(iOS 26.0, *) {
-      try await scheduleAlarmKit(id: id, title: title, hour: hour, minute: minute, weekdays: weekdays)
+      try await scheduleAlarmKit(id: id, title: title, hour: hour, minute: minute, weekdays: weekdays, options: alarm.ios, metadata: metadata)
     } else {
       throw UnsupportedAlarmException("AlarmKit requires iOS 26 or newer.")
     }
@@ -127,7 +172,8 @@ public class ExpoAlarmModule: Module {
       "title": title,
       "weekdays": weekdays,
       "timestamp": timestamp,
-      "platform": "ios"
+      "platform": "ios",
+      "metadata": metadata
     ]
     save(alarm: stored)
     return stored
@@ -149,22 +195,83 @@ public class ExpoAlarmModule: Module {
     return didCancelNativeAlarm || didRemoveStoredAlarm
   }
 
+  private func currentAlarmContext() -> [String: Any]? {
+    #if canImport(AlarmKit)
+    if #available(iOS 26.0, *) {
+      let activeAlarms = (try? AlarmManager.shared.alarms) ?? []
+      let activeIds = Set(activeAlarms.map { $0.id.uuidString })
+      let storedById = Dictionary(uniqueKeysWithValues: storedAlarms().compactMap { alarm -> (String, [String: Any])? in
+        guard let id = alarm["id"] as? String else {
+          return nil
+        }
+        return (id, alarm)
+      })
+
+      let activeContexts = activeAlarms.compactMap { alarm -> [String: Any]? in
+        let id = alarm.id.uuidString
+        guard let storedAlarm = storedById[id] else {
+          return [
+            "id": id,
+            "metadata": normalizeMetadata(nil, id: id, title: "Alarm"),
+            "state": mapAlarmState(alarm.state)
+          ]
+        }
+        return alarmContext(from: storedAlarm, state: mapAlarmState(alarm.state))
+      }
+
+      if let alertingContext = activeContexts.first(where: { ($0["state"] as? String) == "alerting" }) {
+        return alertingContext
+      }
+      if let countdownContext = activeContexts.first(where: { ($0["state"] as? String) == "countdown" }) {
+        return countdownContext
+      }
+      if let pausedContext = activeContexts.first(where: { ($0["state"] as? String) == "paused" }) {
+        return pausedContext
+      }
+      if let recentFiredContext = recentFiredAlarmContext(excluding: activeIds) {
+        return recentFiredContext
+      }
+      return activeContexts.first(where: { ($0["state"] as? String) == "scheduled" })
+    }
+    #endif
+
+    return nil
+  }
+
   #if canImport(AlarmKit)
   @available(iOS 26.0, *)
-  private func scheduleAlarmKit(id: String, title: String, hour: Int, minute: Int, weekdays: [Int]) async throws {
+  private func scheduleAlarmKit(
+    id: String,
+    title: String,
+    hour: Int,
+    minute: Int,
+    weekdays: [Int],
+    options: IosAlarmOptionsRecord?,
+    metadata: [String: Any]
+  ) async throws {
     guard let alarmID = UUID(uuidString: id) else {
       throw InvalidAlarmException("Alarm id must be a UUID string on iOS.")
     }
 
+    let alertTitle = options?.alertTitle?.isEmpty == false ? options!.alertTitle! : title
+    let stopButtonTitle = options?.stopButtonTitle?.isEmpty == false ? options!.stopButtonTitle! : "Stop"
+    let secondaryButtonTitle = options?.secondaryButtonTitle?.isEmpty == false ? options!.secondaryButtonTitle! : nil
+    let countdownTitle = options?.countdownTitle?.isEmpty == false ? options!.countdownTitle! : nil
+    let secondaryButton = secondaryButtonTitle.map {
+      AlarmButton(text: LocalizedStringResource(stringLiteral: $0), textColor: .white, systemImageName: "app.badge")
+    }
     let presentation = AlarmPresentation(
       alert: AlarmPresentation.Alert(
-        title: LocalizedStringResource(stringLiteral: title),
-        stopButton: AlarmButton(text: LocalizedStringResource("Stop"), textColor: .white, systemImageName: "stop.fill")
-      )
+        title: LocalizedStringResource(stringLiteral: alertTitle),
+        stopButton: AlarmButton(text: LocalizedStringResource(stringLiteral: stopButtonTitle), textColor: .white, systemImageName: "stop.fill"),
+        secondaryButton: secondaryButton,
+        secondaryButtonBehavior: secondaryButton == nil ? nil : .custom
+      ),
+      countdown: countdownTitle.map { AlarmPresentation.Countdown(title: LocalizedStringResource(stringLiteral: $0)) }
     )
     let attributes = AlarmAttributes(
       presentation: presentation,
-      metadata: ExpoAlarmMetadata(title: title),
+      metadata: ExpoAlarmMetadata(alarmId: id, title: title, values: alarmKitMetadataValues(metadata)),
       tintColor: Color.accentColor
     )
     let schedule = try makeAlarmKitSchedule(hour: hour, minute: minute, weekdays: weekdays)
@@ -218,6 +325,82 @@ public class ExpoAlarmModule: Module {
       throw InvalidAlarmException("weekdays must use 1=Monday through 7=Sunday.")
     }
     return normalized
+  }
+
+  private func normalizeMetadata(_ metadata: [String: Any]?, id: String, title: String) -> [String: Any] {
+    var normalized: [String: Any] = [:]
+    metadata?.forEach { key, value in
+      guard !key.isEmpty else {
+        return
+      }
+      if let value = value as? String {
+        normalized[key] = value
+      } else if let value = value as? Bool {
+        normalized[key] = value
+      } else if let value = value as? Int {
+        normalized[key] = value
+      } else if let value = value as? Double {
+        normalized[key] = value
+      } else if let value = value as? Float {
+        normalized[key] = Double(value)
+      } else if let value = value as? NSNumber {
+        normalized[key] = value
+      }
+    }
+    normalized["alarmId"] = id
+    normalized["title"] = title
+    return normalized
+  }
+
+  private func alarmContext(from alarm: [String: Any], state: String) -> [String: Any]? {
+    guard let id = alarm["id"] as? String else {
+      return nil
+    }
+    return [
+      "id": id,
+      "metadata": alarm["metadata"] as? [String: Any] ?? normalizeMetadata(nil, id: id, title: alarm["title"] as? String ?? "Alarm"),
+      "state": state
+    ]
+  }
+
+  private func recentFiredAlarmContext(excluding activeIds: Set<String>) -> [String: Any]? {
+    let now = Int64(Date().timeIntervalSince1970 * 1000)
+    let recentWindowMillis: Int64 = 60 * 60 * 1000
+    return storedAlarms()
+      .filter { alarm in
+        guard
+          let id = alarm["id"] as? String,
+          let timestamp = alarmTimestamp(alarm["timestamp"])
+        else {
+          return false
+        }
+        let weekdays = alarm["weekdays"] as? [Int] ?? []
+        return weekdays.isEmpty &&
+          !activeIds.contains(id) &&
+          timestamp <= now &&
+          now - timestamp <= recentWindowMillis
+      }
+      .sorted {
+        (alarmTimestamp($0["timestamp"]) ?? 0) > (alarmTimestamp($1["timestamp"]) ?? 0)
+      }
+      .compactMap { alarmContext(from: $0, state: "alerting") }
+      .first
+  }
+
+  private func alarmTimestamp(_ value: Any?) -> Int64? {
+    if let value = value as? Int64 {
+      return value
+    }
+    if let value = value as? Int {
+      return Int64(value)
+    }
+    if let value = value as? Double {
+      return Int64(value)
+    }
+    if let value = value as? NSNumber {
+      return value.int64Value
+    }
+    return nil
   }
 
   private func nextTriggerTimestamp(hour: Int, minute: Int, weekdays: [Int]) -> Int64 {
@@ -283,6 +466,43 @@ public class ExpoAlarmModule: Module {
     @unknown default:
       return "unknown"
     }
+  }
+
+  @available(iOS 26.0, *)
+  private func mapAlarmState(_ state: Alarm.State) -> String {
+    switch state {
+    case .scheduled:
+      return "scheduled"
+    case .alerting:
+      return "alerting"
+    case .countdown:
+      return "countdown"
+    case .paused:
+      return "paused"
+    @unknown default:
+      return "scheduled"
+    }
+  }
+
+  @available(iOS 26.0, *)
+  private func alarmKitMetadataValues(_ metadata: [String: Any]) -> [String: ExpoAlarmMetadataValue] {
+    var values: [String: ExpoAlarmMetadataValue] = [:]
+    metadata.forEach { key, value in
+      if let value = value as? String {
+        values[key] = .string(value)
+      } else if let value = value as? Bool {
+        values[key] = .bool(value)
+      } else if let value = value as? Int {
+        values[key] = .number(Double(value))
+      } else if let value = value as? Double {
+        values[key] = .number(value)
+      } else if let value = value as? Float {
+        values[key] = .number(Double(value))
+      } else if let value = value as? NSNumber {
+        values[key] = .number(value.doubleValue)
+      }
+    }
+    return values
   }
   #endif
 }

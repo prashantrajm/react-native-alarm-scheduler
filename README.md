@@ -9,6 +9,7 @@ Native alarm scheduling for React Native and Expo apps with Android exact alarms
 - Android alarm scheduling through `AlarmManager.setAlarmClock`.
 - Android system Clock integration through `AlarmClock.ACTION_SET_ALARM` and `AlarmClock.ACTION_SHOW_ALARMS`.
 - iOS native alarm scheduling through AlarmKit on iOS 26+.
+- iOS AlarmKit metadata and presentation options for app-resolved alarm routing.
 - Config plugin for Android permissions and `NSAlarmKitUsageDescription`.
 - Typed TypeScript API for React Native and Expo apps.
 - Explicit unsupported behavior for platforms or OS versions that cannot schedule native alarms.
@@ -23,6 +24,7 @@ Native alarm scheduling for React Native and Expo apps with Android exact alarms
 | Schedule an app-owned alarm | Yes. Uses `AlarmManager.setAlarmClock` for user-visible alarms. | Yes on iOS 26+ through AlarmKit. | `scheduleAlarmAsync()` |
 | Cancel an app-owned alarm | Yes. Cancels alarms created by this package. | Yes on iOS 26+ for alarms created by this package. | `cancelAlarmAsync(id)` |
 | List app-owned alarms | Stored by this package. Android does not expose all system Clock alarms to apps. | Stored by this package. iOS does not expose all Clock app alarms to apps. | `getScheduledAlarmsAsync()` |
+| Read current alarm context | No. Android alarm launches use the app launcher intent. | Yes. Uses package-stored metadata plus AlarmKit alarm state when available. | `getCurrentAlarmContextAsync()` |
 | Create an alarm in the system Clock app | Yes. Uses `AlarmClock.ACTION_SET_ALARM`. | No public iOS API exists for creating Clock app alarms. | `setSystemAlarmAsync()` on Android only |
 | Open the system alarm app | Yes. Uses `AlarmClock.ACTION_SHOW_ALARMS`. | Best effort only through a Clock URL; iOS may ignore it. | `openSystemAlarmAppAsync()` |
 | Fire JS event when an alarm triggers | Limited by app process state. | Limited by app process state. | `onAlarmTriggered` is declared; Android also shows a native notification. |
@@ -99,6 +101,13 @@ if (permissions.canScheduleExactAlarms) {
     minute: 30,
     title: 'Morning alarm',
     weekdays: [1, 2, 3, 4, 5],
+    ios: {
+      metadata: {
+        mission: 'math',
+      },
+      alertTitle: 'Morning alarm',
+      stopButtonTitle: 'Open Mission',
+    },
   });
 
   await ExpoAlarm.cancelAlarmAsync(alarm.id);
@@ -175,6 +184,13 @@ type AlarmScheduleInput = {
   weekdays?: AlarmWeekday[];
   timestamp?: number;
   showUi?: boolean;
+  ios?: {
+    metadata?: Record<string, string | number | boolean>;
+    alertTitle?: string;
+    stopButtonTitle?: string;
+    secondaryButtonTitle?: string;
+    countdownTitle?: string;
+  };
 };
 
 type AlarmWeekday = 1 | 2 | 3 | 4 | 5 | 6 | 7;
@@ -187,6 +203,7 @@ type ScheduledAlarm = {
   weekdays: AlarmWeekday[];
   timestamp: number;
   platform: 'android' | 'ios';
+  metadata?: Record<string, string | number | boolean>;
 };
 ```
 
@@ -197,6 +214,8 @@ Notes:
 - `timestamp` is milliseconds since Unix epoch. If omitted, the module schedules the next matching `hour` and `minute`.
 - Android accepts any string `id`.
 - iOS AlarmKit requires `id` to be a UUID string when you provide one.
+- `ios.metadata` is stored by the package and included in AlarmKit metadata. The package always adds `alarmId` and `title`.
+- iOS presentation options customize AlarmKit text only. They are not Android-style launch intents and do not force a React Native route.
 
 ### `cancelAlarmAsync(id)`
 
@@ -205,6 +224,20 @@ Cancels an app-owned alarm by id. Returns `true` when a native or stored alarm w
 ### `getScheduledAlarmsAsync()`
 
 Returns the app-owned alarms stored by this module.
+
+### `getCurrentAlarmContextAsync()`
+
+Returns iOS alarm context for app launch or resume routing:
+
+```ts
+type AlarmContext = {
+  id: string;
+  metadata?: Record<string, string | number | boolean>;
+  state?: 'scheduled' | 'alerting' | 'countdown' | 'paused';
+};
+```
+
+On iOS 26+, this reads AlarmKit alarms owned by the app and joins them with metadata stored by this package. If a one-shot alarm recently fired and AlarmKit already removed it from the daemon store, the package can still return the stored metadata for a short recovery window. On Android and Web this returns `null`.
 
 ### `setSystemAlarmAsync(alarm)`
 
@@ -244,6 +277,8 @@ iOS alarm scheduling uses AlarmKit. The app must:
 - Receive user authorization through `requestPermissionsAsync()`.
 
 Older iOS versions return `status: 'unavailable'`.
+
+AlarmKit does not expose Android-style `Intent` or `PendingIntent` launch routing. For route-specific behavior, put route context such as `alarmId` or `mission` in `ios.metadata`, then call `getCurrentAlarmContextAsync()` on app launch or resume and navigate from JavaScript.
 
 ## Development
 
