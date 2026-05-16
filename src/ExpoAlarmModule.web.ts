@@ -2,6 +2,7 @@ import { registerWebModule, NativeModule } from "expo";
 
 import type {
   AlarmPermissionResponse,
+  AlarmAction,
   AlarmContext,
   AlarmScheduleInput,
   ExpoAlarmModuleEvents,
@@ -40,6 +41,12 @@ class ExpoAlarmModule extends NativeModule<ExpoAlarmModuleEvents> {
   async getCurrentAlarmContextAsync(): Promise<AlarmContext | null> {
     return null;
   }
+
+  async getPendingAlarmActionsAsync(): Promise<AlarmAction[]> {
+    return [];
+  }
+
+  async clearPendingAlarmActionsAsync(_ids?: string[]): Promise<void> {}
 
   async setSystemAlarmAsync(_alarm: AlarmScheduleInput): Promise<boolean> {
     throw new Error("System alarms are only available on Android.");

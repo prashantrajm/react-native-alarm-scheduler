@@ -4,6 +4,7 @@ import UIKit
 
 #if canImport(AlarmKit)
 import AlarmKit
+import AppIntents
 import SwiftUI
 #endif
 
@@ -24,6 +25,46 @@ struct IosAlarmOptionsRecord: Record {
   @Field var stopButtonTitle: String?
   @Field var secondaryButtonTitle: String?
   @Field var countdownTitle: String?
+  @Field var stopIntentBehavior: String?
+  @Field var secondaryButtonBehavior: String?
+}
+
+private enum ExpoAlarmActionStore {
+  private static let actionsKey = "expo_alarm_actions"
+  static let actionRecordedNotification = Notification.Name("expo.modules.alarm.actionRecorded")
+
+  static func all() -> [[String: Any]] {
+    UserDefaults.standard.array(forKey: actionsKey) as? [[String: Any]] ?? []
+  }
+
+  static func record(alarmId: String, action: String, timestamp: Int64 = Int64(Date().timeIntervalSince1970 * 1000)) -> [String: Any] {
+    let event: [String: Any] = [
+      "id": UUID().uuidString,
+      "alarmId": alarmId,
+      "action": action,
+      "timestamp": timestamp
+    ]
+    var actions = all()
+    actions.append(event)
+    UserDefaults.standard.set(actions, forKey: actionsKey)
+    NotificationCenter.default.post(name: actionRecordedNotification, object: nil, userInfo: event)
+    return event
+  }
+
+  static func clear(ids: [String]?) {
+    guard let ids, !ids.isEmpty else {
+      UserDefaults.standard.removeObject(forKey: actionsKey)
+      return
+    }
+    let idsToRemove = Set(ids)
+    let remaining = all().filter { action in
+      guard let id = action["id"] as? String else {
+        return true
+      }
+      return !idsToRemove.contains(id)
+    }
+    UserDefaults.standard.set(remaining, forKey: actionsKey)
+  }
 }
 
 #if canImport(AlarmKit)
@@ -62,13 +103,92 @@ private enum ExpoAlarmMetadataValue: Codable, Hashable, Sendable {
     }
   }
 }
+
+@available(iOS 26.0, *)
+private struct ExpoAlarmStopIntent: LiveActivityIntent {
+  static var title: LocalizedStringResource = "Stop Alarm"
+  static var authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed
+  static var supportedModes: IntentModes = .background
+
+  @Parameter(title: "Alarm ID")
+  var alarmId: String
+
+  init() {
+    alarmId = ""
+  }
+
+  init(alarmId: String) {
+    self.alarmId = alarmId
+  }
+
+  func perform() async throws -> some IntentResult {
+    _ = ExpoAlarmActionStore.record(alarmId: alarmId, action: "nativeStop")
+    return .result()
+  }
+}
+
+@available(iOS 26.0, *)
+private struct ExpoAlarmSecondaryOpenIntent: LiveActivityIntent {
+  static var title: LocalizedStringResource = "Open Alarm"
+  static var authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed
+  static var supportedModes: IntentModes = .foreground(.immediate)
+
+  @Parameter(title: "Alarm ID")
+  var alarmId: String
+
+  init() {
+    alarmId = ""
+  }
+
+  init(alarmId: String) {
+    self.alarmId = alarmId
+  }
+
+  func perform() async throws -> some IntentResult {
+    _ = ExpoAlarmActionStore.record(alarmId: alarmId, action: "secondaryOpen")
+    return .result()
+  }
+}
+
+@available(iOS 26.0, *)
+private struct ExpoAlarmSecondaryRecordIntent: LiveActivityIntent {
+  static var title: LocalizedStringResource = "Record Alarm Action"
+  static var authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed
+  static var supportedModes: IntentModes = .background
+
+  @Parameter(title: "Alarm ID")
+  var alarmId: String
+
+  init() {
+    alarmId = ""
+  }
+
+  init(alarmId: String) {
+    self.alarmId = alarmId
+  }
+
+  func perform() async throws -> some IntentResult {
+    _ = ExpoAlarmActionStore.record(alarmId: alarmId, action: "secondaryOpen")
+    return .result()
+  }
+}
 #endif
 
 public class ExpoAlarmModule: Module {
+  private var alarmActionObserver: NSObjectProtocol?
+  private var alarmUpdatesTask: Task<Void, Never>?
+
+  deinit {
+    if let alarmActionObserver {
+      NotificationCenter.default.removeObserver(alarmActionObserver)
+    }
+    alarmUpdatesTask?.cancel()
+  }
+
   public func definition() -> ModuleDefinition {
     Name("ExpoAlarm")
 
-    Events("onAlarmTriggered")
+    Events("onAlarmTriggered", "onAlarmAction", "onAlarmStateChange")
 
     AsyncFunction("getPermissionsAsync") { () async -> [String: Any] in
       return await self.permissions()
@@ -109,6 +229,14 @@ public class ExpoAlarmModule: Module {
       return self.currentAlarmContext()
     }
 
+    AsyncFunction("getPendingAlarmActionsAsync") { () -> [[String: Any]] in
+      return ExpoAlarmActionStore.all()
+    }
+
+    AsyncFunction("clearPendingAlarmActionsAsync") { (ids: [String]?) -> Void in
+      ExpoAlarmActionStore.clear(ids: ids)
+    }
+
     AsyncFunction("setSystemAlarmAsync") { (_: AlarmScheduleRecord) throws -> Bool in
       throw UnsupportedAlarmException("iOS does not expose the Clock app alarm list through a public API. Use scheduleAlarmAsync on iOS 26+.")
     }
@@ -122,12 +250,92 @@ public class ExpoAlarmModule: Module {
       }
       return true
     }.runOnQueue(.main)
+
+    OnStartObserving("onAlarmAction") {
+      self.startAlarmActionObserving()
+    }
+
+    OnStopObserving("onAlarmAction") {
+      self.stopAlarmActionObserving()
+    }
+
+    OnStartObserving("onAlarmStateChange") {
+      self.startAlarmUpdatesObserving()
+    }
+
+    OnStopObserving("onAlarmStateChange") {
+      self.stopAlarmUpdatesObserving()
+    }
   }
+
+  private func startAlarmActionObserving() {
+    guard alarmActionObserver == nil else {
+      return
+    }
+    alarmActionObserver = NotificationCenter.default.addObserver(
+      forName: ExpoAlarmActionStore.actionRecordedNotification,
+      object: nil,
+      queue: .main
+    ) { [weak self] notification in
+      guard let action = notification.userInfo as? [String: Any] else {
+        return
+      }
+      self?.sendEvent("onAlarmAction", action)
+    }
+  }
+
+  private func stopAlarmActionObserving() {
+    if let alarmActionObserver {
+      NotificationCenter.default.removeObserver(alarmActionObserver)
+      self.alarmActionObserver = nil
+    }
+  }
+
+  private func startAlarmUpdatesObserving() {
+    guard alarmUpdatesTask == nil else {
+      return
+    }
+    #if canImport(AlarmKit)
+    if #available(iOS 26.0, *) {
+      alarmUpdatesTask = Task { [weak self] in
+        for await alarms in AlarmManager.shared.alarmUpdates {
+          guard !Task.isCancelled else {
+            return
+          }
+          for alarm in alarms {
+            await self?.sendAlarmStateChange(alarm)
+          }
+        }
+      }
+    }
+    #endif
+  }
+
+  private func stopAlarmUpdatesObserving() {
+    alarmUpdatesTask?.cancel()
+    alarmUpdatesTask = nil
+  }
+
+  #if canImport(AlarmKit)
+  @available(iOS 26.0, *)
+  @MainActor
+  private func sendAlarmStateChange(_ alarm: Alarm) {
+    var event: [String: Any] = [
+      "id": alarm.id.uuidString,
+      "state": mapAlarmState(alarm.state),
+      "timestamp": Int64(Date().timeIntervalSince1970 * 1000)
+    ]
+    if let storedAlarm = storedAlarms().first(where: { ($0["id"] as? String) == alarm.id.uuidString }) {
+      event["metadata"] = storedAlarm["metadata"]
+    }
+    sendEvent("onAlarmStateChange", event)
+  }
+  #endif
 
   private func permissions() async -> [String: Any] {
     #if canImport(AlarmKit)
     if #available(iOS 26.0, *) {
-      let status = await AlarmManager.shared.authorizationState
+      let status = AlarmManager.shared.authorizationState
       return [
         "platform": "ios",
         "status": mapAuthorizationStatus(status),
@@ -185,7 +393,7 @@ public class ExpoAlarmModule: Module {
     #if canImport(AlarmKit)
     if #available(iOS 26.0, *) {
       if let uuid = UUID(uuidString: id) {
-        try? await AlarmManager.shared.cancel(id: uuid)
+        try? AlarmManager.shared.cancel(id: uuid)
         didCancelNativeAlarm = true
       }
     }
@@ -257,16 +465,18 @@ public class ExpoAlarmModule: Module {
     let stopButtonTitle = options?.stopButtonTitle?.isEmpty == false ? options!.stopButtonTitle! : "Stop"
     let secondaryButtonTitle = options?.secondaryButtonTitle?.isEmpty == false ? options!.secondaryButtonTitle! : nil
     let countdownTitle = options?.countdownTitle?.isEmpty == false ? options!.countdownTitle! : nil
+    let secondaryButtonBehavior = normalizeSecondaryButtonBehavior(options?.secondaryButtonBehavior, hasSecondaryButton: secondaryButtonTitle != nil)
     let secondaryButton = secondaryButtonTitle.map {
       AlarmButton(text: LocalizedStringResource(stringLiteral: $0), textColor: .white, systemImageName: "app.badge")
     }
+    let alert = makeAlertPresentation(
+      title: alertTitle,
+      stopButtonTitle: stopButtonTitle,
+      secondaryButton: secondaryButton,
+      secondaryButtonBehavior: secondaryButtonBehavior
+    )
     let presentation = AlarmPresentation(
-      alert: AlarmPresentation.Alert(
-        title: LocalizedStringResource(stringLiteral: alertTitle),
-        stopButton: AlarmButton(text: LocalizedStringResource(stringLiteral: stopButtonTitle), textColor: .white, systemImageName: "stop.fill"),
-        secondaryButton: secondaryButton,
-        secondaryButtonBehavior: secondaryButton == nil ? nil : .custom
-      ),
+      alert: alert,
       countdown: countdownTitle.map { AlarmPresentation.Countdown(title: LocalizedStringResource(stringLiteral: $0)) }
     )
     let attributes = AlarmAttributes(
@@ -275,10 +485,79 @@ public class ExpoAlarmModule: Module {
       tintColor: Color.accentColor
     )
     let schedule = try makeAlarmKitSchedule(hour: hour, minute: minute, weekdays: weekdays)
+    let stopIntent = makeStopIntent(id: id, behavior: options?.stopIntentBehavior)
+    let secondaryIntent = makeSecondaryIntent(id: id, behavior: options?.secondaryButtonBehavior)
     _ = try await AlarmManager.shared.schedule(
       id: alarmID,
-      configuration: AlarmManager.AlarmConfiguration(schedule: schedule, attributes: attributes)
+      configuration: AlarmManager.AlarmConfiguration.alarm(
+        schedule: schedule,
+        attributes: attributes,
+        stopIntent: stopIntent,
+        secondaryIntent: secondaryIntent
+      )
     )
+  }
+
+  @available(iOS 26.0, *)
+  private func makeAlertPresentation(
+    title: String,
+    stopButtonTitle: String,
+    secondaryButton: AlarmButton?,
+    secondaryButtonBehavior: AlarmPresentation.Alert.SecondaryButtonBehavior?
+  ) -> AlarmPresentation.Alert {
+    if #available(iOS 26.1, *) {
+      return AlarmPresentation.Alert(
+        title: LocalizedStringResource(stringLiteral: title),
+        secondaryButton: secondaryButton,
+        secondaryButtonBehavior: secondaryButtonBehavior
+      )
+    }
+    return AlarmPresentation.Alert(
+      title: LocalizedStringResource(stringLiteral: title),
+      stopButton: AlarmButton(text: LocalizedStringResource(stringLiteral: stopButtonTitle), textColor: .white, systemImageName: "stop.fill"),
+      secondaryButton: secondaryButton,
+      secondaryButtonBehavior: secondaryButtonBehavior
+    )
+  }
+
+  @available(iOS 26.0, *)
+  private func makeStopIntent(id: String, behavior: String?) -> (any LiveActivityIntent)? {
+    switch behavior ?? "recordOnly" {
+    case "recordOnly":
+      return ExpoAlarmStopIntent(alarmId: id)
+    default:
+      return nil
+    }
+  }
+
+  @available(iOS 26.0, *)
+  private func makeSecondaryIntent(id: String, behavior: String?) -> (any LiveActivityIntent)? {
+    switch behavior ?? "openApp" {
+    case "openApp":
+      return ExpoAlarmSecondaryOpenIntent(alarmId: id)
+    case "recordOnly":
+      return ExpoAlarmSecondaryRecordIntent(alarmId: id)
+    default:
+      return nil
+    }
+  }
+
+  @available(iOS 26.0, *)
+  private func normalizeSecondaryButtonBehavior(
+    _ behavior: String?,
+    hasSecondaryButton: Bool
+  ) -> AlarmPresentation.Alert.SecondaryButtonBehavior? {
+    guard hasSecondaryButton else {
+      return nil
+    }
+    switch behavior ?? "openApp" {
+    case "openApp", "recordOnly":
+      return .custom
+    case "none":
+      return nil
+    default:
+      return .custom
+    }
   }
 
   @available(iOS 26.0, *)

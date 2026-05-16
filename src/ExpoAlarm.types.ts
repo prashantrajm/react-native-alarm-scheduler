@@ -14,6 +14,8 @@ export type AlarmPermissionResponse = {
 
 export type ExpoAlarmModuleEvents = {
   onAlarmTriggered: (alarm: ScheduledAlarm) => void;
+  onAlarmAction: (action: AlarmAction) => void;
+  onAlarmStateChange: (event: AlarmStateChange) => void;
 };
 
 export type AlarmWeekday = 1 | 2 | 3 | 4 | 5 | 6 | 7;
@@ -28,6 +30,21 @@ export type IosAlarmOptions = {
   stopButtonTitle?: string;
   secondaryButtonTitle?: string;
   countdownTitle?: string;
+  stopIntentBehavior?: "recordOnly";
+  secondaryButtonBehavior?: "openApp" | "recordOnly" | "none";
+};
+
+export type AlarmActionType =
+  | "nativeStop"
+  | "secondaryOpen"
+  | "snooze"
+  | "dismiss";
+
+export type AlarmAction = {
+  id: string;
+  alarmId: string;
+  action: AlarmActionType;
+  timestamp: number;
 };
 
 export type AlarmScheduleInput = {
@@ -62,4 +79,11 @@ export type AlarmContext = {
   id: string;
   metadata?: AlarmMetadata;
   state?: AlarmContextState;
+};
+
+export type AlarmStateChange = {
+  id: string;
+  state: AlarmContextState;
+  timestamp: number;
+  metadata?: AlarmMetadata;
 };

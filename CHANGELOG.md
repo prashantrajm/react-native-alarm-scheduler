@@ -10,6 +10,13 @@
 
 ### 💡 Others
 
+## 0.1.2
+
+### 🎉 New features
+
+- Add built-in iOS AlarmKit App Intents for native stop and secondary alarm actions.
+- Add pending alarm action APIs and best-effort foreground action/state listeners.
+
 ## 0.1.1
 
 ### 🎉 New features

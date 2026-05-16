@@ -37,7 +37,10 @@ export default function App() {
                     mission: 'example',
                   },
                   alertTitle: 'Expo Alarm example',
-                  stopButtonTitle: 'Open Mission',
+                  stopButtonTitle: 'Stop',
+                  secondaryButtonTitle: 'Open Mission',
+                  stopIntentBehavior: 'recordOnly',
+                  secondaryButtonBehavior: 'openApp',
                 },
               }));
             }}
@@ -46,6 +49,18 @@ export default function App() {
             title="Read current alarm context"
             onPress={async () => {
               console.log(await ExpoAlarm.getCurrentAlarmContextAsync());
+            }}
+          />
+          <Button
+            title="Read pending alarm actions"
+            onPress={async () => {
+              console.log(await ExpoAlarm.getPendingAlarmActionsAsync());
+            }}
+          />
+          <Button
+            title="Clear pending alarm actions"
+            onPress={async () => {
+              await ExpoAlarm.clearPendingAlarmActionsAsync();
             }}
           />
         </Group>

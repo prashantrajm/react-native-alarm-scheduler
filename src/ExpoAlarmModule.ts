@@ -2,6 +2,7 @@ import { NativeModule, requireNativeModule } from "expo";
 
 import type {
   AlarmPermissionResponse,
+  AlarmAction,
   AlarmContext,
   AlarmScheduleInput,
   ExpoAlarmModuleEvents,
@@ -16,6 +17,8 @@ declare class ExpoAlarmModule extends NativeModule<ExpoAlarmModuleEvents> {
   cancelAlarmAsync(id: string): Promise<boolean>;
   getScheduledAlarmsAsync(): Promise<ScheduledAlarm[]>;
   getCurrentAlarmContextAsync(): Promise<AlarmContext | null>;
+  getPendingAlarmActionsAsync(): Promise<AlarmAction[]>;
+  clearPendingAlarmActionsAsync(ids?: string[]): Promise<void>;
   setSystemAlarmAsync(alarm: AlarmScheduleInput): Promise<boolean>;
   openSystemAlarmAppAsync(): Promise<boolean>;
 }

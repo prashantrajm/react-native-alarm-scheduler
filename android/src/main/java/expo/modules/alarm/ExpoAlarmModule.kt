@@ -28,13 +28,15 @@ class IosAlarmOptionsRecord : Record {
   @Field var stopButtonTitle: String? = null
   @Field var secondaryButtonTitle: String? = null
   @Field var countdownTitle: String? = null
+  @Field var stopIntentBehavior: String? = null
+  @Field var secondaryButtonBehavior: String? = null
 }
 
 class ExpoAlarmModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("ExpoAlarm")
 
-    Events("onAlarmTriggered")
+    Events("onAlarmTriggered", "onAlarmAction", "onAlarmStateChange")
 
     AsyncFunction("getPermissionsAsync") {
       permissions()
@@ -81,6 +83,14 @@ class ExpoAlarmModule : Module() {
     }
 
     AsyncFunction("getCurrentAlarmContextAsync") {
+      null
+    }
+
+    AsyncFunction("getPendingAlarmActionsAsync") {
+      emptyList<Map<String, Any>>()
+    }
+
+    AsyncFunction("clearPendingAlarmActionsAsync") { _: List<String>? ->
       null
     }
 
