@@ -30,7 +30,7 @@ export type IosAlarmOptions = {
   stopButtonTitle?: string;
   secondaryButtonTitle?: string;
   countdownTitle?: string;
-  stopIntentBehavior?: "recordOnly";
+  stopIntentBehavior?: "recordOnly" | "openApp" | "rescheduleImmediate";
   secondaryButtonBehavior?: "openApp" | "recordOnly" | "none";
 };
 
@@ -45,6 +45,9 @@ export type AlarmAction = {
   alarmId: string;
   action: AlarmActionType;
   timestamp: number;
+  foregroundRequested?: boolean;
+  rescheduled?: boolean;
+  rescheduledAlarmId?: string;
 };
 
 export type AlarmScheduleInput = {

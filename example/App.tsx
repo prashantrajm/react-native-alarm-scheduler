@@ -39,7 +39,7 @@ export default function App() {
                   alertTitle: 'Expo Alarm example',
                   stopButtonTitle: 'Stop',
                   secondaryButtonTitle: 'Open Mission',
-                  stopIntentBehavior: 'recordOnly',
+                  stopIntentBehavior: 'openApp',
                   secondaryButtonBehavior: 'openApp',
                 },
               }));

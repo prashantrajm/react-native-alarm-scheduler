@@ -110,7 +110,7 @@ if (permissions.canScheduleExactAlarms) {
       alertTitle: 'Morning alarm',
       stopButtonTitle: 'Stop',
       secondaryButtonTitle: 'Open Mission',
-      stopIntentBehavior: 'recordOnly',
+      stopIntentBehavior: 'openApp',
       secondaryButtonBehavior: 'openApp',
     },
   });
@@ -195,7 +195,7 @@ type AlarmScheduleInput = {
     stopButtonTitle?: string;
     secondaryButtonTitle?: string;
     countdownTitle?: string;
-    stopIntentBehavior?: 'recordOnly';
+    stopIntentBehavior?: 'recordOnly' | 'openApp' | 'rescheduleImmediate';
     secondaryButtonBehavior?: 'openApp' | 'recordOnly' | 'none';
   };
 };
@@ -224,6 +224,8 @@ Notes:
 - `ios.metadata` is stored by the package and included in AlarmKit metadata. The package always adds `alarmId` and `title`.
 - iOS presentation options customize AlarmKit text only. They are not Android-style launch intents and do not force a React Native route.
 - `ios.stopIntentBehavior: 'recordOnly'` installs a built-in AlarmKit App Intent that records a `nativeStop` action when the system stop control is pressed.
+- `ios.stopIntentBehavior: 'openApp'` records `nativeStop` and asks iOS to foreground the app immediately. The action record includes `foregroundRequested: true`; iOS does not provide a reliable success callback to the package.
+- `ios.stopIntentBehavior: 'rescheduleImmediate'` records `nativeStop`, asks iOS to foreground the app, and attempts to schedule an immediate retry alarm until JS calls `completeNativeAlarmAsync(alarmId)` or `clearBypassAsync(alarmId)`. AlarmKit schedules alarms by time components, so iOS may coerce this to the next available minute instead of exact seconds.
 - `ios.secondaryButtonBehavior: 'openApp'` installs a built-in AlarmKit App Intent that records `secondaryOpen` and asks iOS to open the app. Use `recordOnly` to record without foregrounding, or `none` to omit the secondary intent.
 
 ### `cancelAlarmAsync(id)`
@@ -258,6 +260,9 @@ type AlarmAction = {
   alarmId: string;
   action: 'nativeStop' | 'secondaryOpen' | 'snooze' | 'dismiss';
   timestamp: number;
+  foregroundRequested?: boolean;
+  rescheduled?: boolean;
+  rescheduledAlarmId?: string;
 };
 ```
 
@@ -266,6 +271,14 @@ type AlarmAction = {
 ### `clearPendingAlarmActionsAsync(ids?)`
 
 Clears pending native action records. Pass action record `id` values to clear specific records, or omit `ids` to clear all records.
+
+### `completeNativeAlarmAsync(alarmId)`
+
+Marks the native alarm flow complete for `rescheduleImmediate`. Call this only after the user satisfies your app's mission. This stops future native stop intents from scheduling retry alarms for that `alarmId`.
+
+### `clearBypassAsync(alarmId)`
+
+Clears the completion marker for an alarm id, allowing `rescheduleImmediate` retries again for that alarm id.
 
 ### `setSystemAlarmAsync(alarm)`
 

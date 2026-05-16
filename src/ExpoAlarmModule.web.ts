@@ -48,6 +48,10 @@ class ExpoAlarmModule extends NativeModule<ExpoAlarmModuleEvents> {
 
   async clearPendingAlarmActionsAsync(_ids?: string[]): Promise<void> {}
 
+  async completeNativeAlarmAsync(_alarmId: string): Promise<void> {}
+
+  async clearBypassAsync(_alarmId: string): Promise<void> {}
+
   async setSystemAlarmAsync(_alarm: AlarmScheduleInput): Promise<boolean> {
     throw new Error("System alarms are only available on Android.");
   }

@@ -94,6 +94,14 @@ class ExpoAlarmModule : Module() {
       null
     }
 
+    AsyncFunction("completeNativeAlarmAsync") { _: String ->
+      null
+    }
+
+    AsyncFunction("clearBypassAsync") { _: String ->
+      null
+    }
+
     AsyncFunction("setSystemAlarmAsync") { alarm: AlarmScheduleRecord ->
       val context = requireContext()
       val hour = ExpoAlarmScheduler.requireHour(alarm.hour)

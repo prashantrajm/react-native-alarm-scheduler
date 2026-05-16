@@ -19,6 +19,8 @@ declare class ExpoAlarmModule extends NativeModule<ExpoAlarmModuleEvents> {
   getCurrentAlarmContextAsync(): Promise<AlarmContext | null>;
   getPendingAlarmActionsAsync(): Promise<AlarmAction[]>;
   clearPendingAlarmActionsAsync(ids?: string[]): Promise<void>;
+  completeNativeAlarmAsync(alarmId: string): Promise<void>;
+  clearBypassAsync(alarmId: string): Promise<void>;
   setSystemAlarmAsync(alarm: AlarmScheduleInput): Promise<boolean>;
   openSystemAlarmAppAsync(): Promise<boolean>;
 }

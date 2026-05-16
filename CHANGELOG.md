@@ -10,6 +10,13 @@
 
 ### 💡 Others
 
+## 0.1.3
+
+### 🎉 New features
+
+- Add `openApp` and `rescheduleImmediate` iOS stop intent behaviors.
+- Add `completeNativeAlarmAsync()` and `clearBypassAsync()` for mission-gated native stop retry flows.
+
 ## 0.1.2
 
 ### 🎉 New features
