@@ -34,6 +34,7 @@ const withExpoAlarm = (config, props = {}) => {
 
   config = withInfoPlist(config, (modConfig) => {
     modConfig.modResults.NSAlarmKitUsageDescription = alarmKitUsageDescription;
+    modConfig.modResults.NSSupportsLiveActivities = true;
     return modConfig;
   });
 

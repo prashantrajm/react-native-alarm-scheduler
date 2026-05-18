@@ -96,6 +96,14 @@ class ExpoAlarmModule : Module() {
       null
     }
 
+    AsyncFunction("getPendingNativeAlarmHandoffAsync") {
+      null
+    }
+
+    AsyncFunction("clearPendingNativeAlarmHandoffAsync") {
+      null
+    }
+
     AsyncFunction("completeNativeAlarmAsync") { _: String ->
       null
     }
@@ -127,6 +135,8 @@ class ExpoAlarmModule : Module() {
         "isComplete" to false,
         "activeRetryAlarmIds" to emptyList<String>(),
         "pendingActions" to emptyList<Map<String, Any>>(),
+        "pendingHandoff" to null,
+        "intentDebugCounts" to emptyMap<String, Int>(),
         "currentContext" to null,
         "alertActionMode" to "default",
         "stopButtonIncluded" to false,

@@ -103,6 +103,8 @@ export type NativeAlarmDebugState = {
   isComplete: boolean;
   activeRetryAlarmIds: string[];
   pendingActions: AlarmAction[];
+  pendingHandoff?: AlarmAction | null;
+  intentDebugCounts?: Record<string, number>;
   currentContext: AlarmContext | null;
   alertActionMode?: "default" | "openMissionOnly";
   stopButtonIncluded?: boolean;

@@ -1,14 +1,22 @@
 # Changelog
 
-## Unpublished
+## 0.1.7
 
 ### 🛠 Breaking changes
 
 ### 🎉 New features
 
+- Add a durable iOS native alarm handoff API for AlarmKit intent-driven app launch routing.
+- Add iOS AlarmKit intent invocation debug counters to native alarm debug state.
+
 ### 🐛 Bug fixes
 
+- Make iOS AlarmKit intent types module-visible and use computed foreground intent modes.
+- Force backup AlarmKit timer alerts to include an explicit stop button presentation.
+
 ### 💡 Others
+
+- Enable `NSSupportsLiveActivities` from the config plugin for iOS AlarmKit intent support.
 
 ## 0.1.6
 
@@ -45,7 +53,7 @@
 ### 🎉 New features
 
 - Add `openApp` and `rescheduleImmediate` iOS stop intent behaviors.
-- Add `completeNativeAlarmAsync()` and `clearBypassAsync()` for mission-gated native stop retry flows.
+- Add `completeNativeAlarmAsync()` and `clearBypassAsync()` for completion-gated native stop retry flows.
 
 ## 0.1.2
 

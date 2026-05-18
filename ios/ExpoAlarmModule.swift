@@ -36,6 +36,8 @@ private enum ExpoAlarmNativeAlarmStore {
   private static let actionsKey = "expo_alarm_actions"
   private static let completionsKey = "expo_alarm_completed_ids"
   private static let retryIdsKey = "expo_alarm_retry_ids_by_alarm"
+  private static let pendingHandoffKey = "expo_alarm_pending_handoff"
+  private static let intentDebugCountsKey = "expo_alarm_intent_debug_counts"
   static let actionRecordedNotification = Notification.Name("expo.modules.alarm.actionRecorded")
 
   static func all() -> [[String: Any]] {
@@ -64,6 +66,26 @@ private enum ExpoAlarmNativeAlarmStore {
     return event
   }
 
+  static func recordIntentHandoff(
+    alarmId: String,
+    action: String,
+    timestamp: Int64 = Int64(Date().timeIntervalSince1970 * 1000),
+    details: [String: Any] = [:]
+  ) -> [String: Any] {
+    incrementIntentInvocation(action: action, alarmId: alarmId)
+    let event = record(alarmId: alarmId, action: action, timestamp: timestamp, details: details)
+    UserDefaults.standard.set(event, forKey: pendingHandoffKey)
+    return event
+  }
+
+  static func pendingHandoff() -> [String: Any]? {
+    UserDefaults.standard.dictionary(forKey: pendingHandoffKey)
+  }
+
+  static func clearPendingHandoff() {
+    UserDefaults.standard.removeObject(forKey: pendingHandoffKey)
+  }
+
   static func clear(ids: [String]?) {
     guard let ids, !ids.isEmpty else {
       UserDefaults.standard.removeObject(forKey: actionsKey)
@@ -84,6 +106,9 @@ private enum ExpoAlarmNativeAlarmStore {
       action["alarmId"] as? String != alarmId
     }
     UserDefaults.standard.set(remaining, forKey: actionsKey)
+    if pendingHandoff()?["alarmId"] as? String == alarmId {
+      clearPendingHandoff()
+    }
   }
 
   static func complete(alarmId: String) {
@@ -128,6 +153,22 @@ private enum ExpoAlarmNativeAlarmStore {
 
   private static func retryIdsByAlarmId() -> [String: [String]] {
     UserDefaults.standard.dictionary(forKey: retryIdsKey) as? [String: [String]] ?? [:]
+  }
+
+  static func intentDebugCounts(alarmId: String) -> [String: Int] {
+    intentDebugCountsByAlarmId()[alarmId] ?? [:]
+  }
+
+  private static func incrementIntentInvocation(action: String, alarmId: String) {
+    var countsByAlarmId = intentDebugCountsByAlarmId()
+    var counts = countsByAlarmId[alarmId] ?? [:]
+    counts[action] = (counts[action] ?? 0) + 1
+    countsByAlarmId[alarmId] = counts
+    UserDefaults.standard.set(countsByAlarmId, forKey: intentDebugCountsKey)
+  }
+
+  private static func intentDebugCountsByAlarmId() -> [String: [String: Int]] {
+    UserDefaults.standard.dictionary(forKey: intentDebugCountsKey) as? [String: [String: Int]] ?? [:]
   }
 }
 
@@ -175,10 +216,10 @@ private enum ExpoAlarmMetadataValue: Codable, Hashable, Sendable {
 }
 
 @available(iOS 26.0, *)
-private struct ExpoAlarmStopIntent: LiveActivityIntent {
+struct ExpoAlarmStopIntent: LiveActivityIntent {
   static var title: LocalizedStringResource = "Stop Alarm"
   static var authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed
-  static var supportedModes: IntentModes = .foreground(.immediate)
+  static var supportedModes: IntentModes { .foreground(.immediate) }
 
   @Parameter(title: "Alarm ID")
   var alarmId: String
@@ -236,16 +277,16 @@ private struct ExpoAlarmStopIntent: LiveActivityIntent {
         details["backupScheduledFor"] = scheduledFor
       }
     }
-    _ = ExpoAlarmNativeAlarmStore.record(alarmId: alarmId, action: "nativeStop", details: details)
+    _ = ExpoAlarmNativeAlarmStore.recordIntentHandoff(alarmId: alarmId, action: "nativeStop", details: details)
     return .result()
   }
 }
 
 @available(iOS 26.0, *)
-private struct ExpoAlarmSecondaryOpenIntent: LiveActivityIntent {
+struct ExpoAlarmSecondaryOpenIntent: LiveActivityIntent {
   static var title: LocalizedStringResource = "Open Alarm"
   static var authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed
-  static var supportedModes: IntentModes = .foreground(.immediate)
+  static var supportedModes: IntentModes { .foreground(.immediate) }
 
   @Parameter(title: "Alarm ID")
   var alarmId: String
@@ -259,16 +300,16 @@ private struct ExpoAlarmSecondaryOpenIntent: LiveActivityIntent {
   }
 
   func perform() async throws -> some IntentResult {
-    _ = ExpoAlarmNativeAlarmStore.record(alarmId: alarmId, action: "secondaryOpen")
+    _ = ExpoAlarmNativeAlarmStore.recordIntentHandoff(alarmId: alarmId, action: "secondaryOpen")
     return .result()
   }
 }
 
 @available(iOS 26.0, *)
-private struct ExpoAlarmSecondaryRecordIntent: LiveActivityIntent {
+struct ExpoAlarmSecondaryRecordIntent: LiveActivityIntent {
   static var title: LocalizedStringResource = "Record Alarm Action"
   static var authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed
-  static var supportedModes: IntentModes = .background
+  static var supportedModes: IntentModes { .background }
 
   @Parameter(title: "Alarm ID")
   var alarmId: String
@@ -282,7 +323,7 @@ private struct ExpoAlarmSecondaryRecordIntent: LiveActivityIntent {
   }
 
   func perform() async throws -> some IntentResult {
-    _ = ExpoAlarmNativeAlarmStore.record(alarmId: alarmId, action: "secondaryOpen")
+    _ = ExpoAlarmNativeAlarmStore.recordIntentHandoff(alarmId: alarmId, action: "secondaryOpen")
     return .result()
   }
 }
@@ -423,9 +464,6 @@ private enum ExpoAlarmRescheduler {
   }
 
   private static func makeAlertPresentation(title: String) -> AlarmPresentation.Alert {
-    if #available(iOS 26.1, *) {
-      return AlarmPresentation.Alert(title: LocalizedStringResource(stringLiteral: title))
-    }
     return AlarmPresentation.Alert(
       title: LocalizedStringResource(stringLiteral: title),
       stopButton: AlarmButton(text: LocalizedStringResource("Stop"), textColor: .white, systemImageName: "stop.fill")
@@ -504,6 +542,14 @@ public class ExpoAlarmModule: Module {
       ExpoAlarmNativeAlarmStore.clear(ids: ids)
     }
 
+    AsyncFunction("getPendingNativeAlarmHandoffAsync") { () -> [String: Any]? in
+      return ExpoAlarmNativeAlarmStore.pendingHandoff()
+    }
+
+    AsyncFunction("clearPendingNativeAlarmHandoffAsync") { () -> Void in
+      ExpoAlarmNativeAlarmStore.clearPendingHandoff()
+    }
+
     AsyncFunction("completeNativeAlarmAsync") { (alarmId: String) async -> Void in
       ExpoAlarmNativeAlarmStore.complete(alarmId: alarmId)
       await self.cancelNativeAndRetryAlarms(originalAlarmId: alarmId)
@@ -532,6 +578,8 @@ public class ExpoAlarmModule: Module {
         "isComplete": ExpoAlarmNativeAlarmStore.isComplete(alarmId: alarmId),
         "activeRetryAlarmIds": ExpoAlarmNativeAlarmStore.retryAlarmIds(for: alarmId),
         "pendingActions": ExpoAlarmNativeAlarmStore.all().filter { ($0["alarmId"] as? String) == alarmId },
+        "pendingHandoff": ExpoAlarmNativeAlarmStore.pendingHandoff() as Any,
+        "intentDebugCounts": ExpoAlarmNativeAlarmStore.intentDebugCounts(alarmId: alarmId),
         "currentContext": self.currentAlarmContext() as Any
       ]
       if let storedAlarm = self.storedAlarms().first(where: { ($0["id"] as? String) == alarmId }),
@@ -879,7 +927,7 @@ public class ExpoAlarmModule: Module {
     let stopButtonTitle = options?.stopButtonTitle?.isEmpty == false ? options!.stopButtonTitle! : "Stop"
     let secondaryButtonTitle = options?.secondaryButtonTitle?.isEmpty == false
       ? options!.secondaryButtonTitle!
-      : (alertActionMode == "openMissionOnly" ? "Open Mission" : nil)
+      : (alertActionMode == "openMissionOnly" ? "Open" : nil)
     let countdownTitle = options?.countdownTitle?.isEmpty == false ? options!.countdownTitle! : nil
     let secondaryButtonBehavior = normalizeSecondaryButtonBehavior(options?.secondaryButtonBehavior, hasSecondaryButton: secondaryButtonTitle != nil)
     let secondaryButton = secondaryButtonTitle.map {

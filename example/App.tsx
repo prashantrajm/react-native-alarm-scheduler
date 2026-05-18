@@ -1,71 +1,213 @@
-import { useEvent } from 'expo';
-import ExpoAlarm from 'react-native-alarm-scheduler';
-import { Button, Platform, SafeAreaView, ScrollView, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import ExpoAlarm, {
+  type AlarmAction,
+  type AlarmContext,
+  type NativeAlarmDebugState,
+  type ScheduledAlarm,
+} from 'react-native-alarm-scheduler';
+import {
+  Button,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
+
+const TEST_ALARM_ID = '00000000-0000-4000-8000-000000000001';
+
+type Snapshot = {
+  permissions?: unknown;
+  scheduled?: ScheduledAlarm[];
+  currentContext?: AlarmContext | null;
+  pendingHandoff?: AlarmAction | null;
+  pendingActions?: AlarmAction[];
+  debug?: NativeAlarmDebugState;
+};
 
 export default function App() {
-  const alarmEvent = useEvent(ExpoAlarm, 'onAlarmTriggered');
+  const [alarmId, setAlarmId] = useState(TEST_ALARM_ID);
+  const [snapshot, setSnapshot] = useState<Snapshot>({});
+  const [events, setEvents] = useState<string[]>([]);
+
+  const appendLog = useCallback((label: string, value?: unknown) => {
+    const text =
+      value === undefined
+        ? label
+        : `${label}: ${JSON.stringify(value, null, 2)}`;
+    console.log(text);
+    setEvents((current) => [text, ...current].slice(0, 30));
+  }, []);
+
+  const inspect = useCallback(
+    async (nextAlarmId = alarmId) => {
+      const [
+        permissions,
+        scheduled,
+        currentContext,
+        pendingHandoff,
+        pendingActions,
+        debug,
+      ] = await Promise.all([
+        ExpoAlarm.getPermissionsAsync(),
+        ExpoAlarm.getScheduledAlarmsAsync(),
+        ExpoAlarm.getCurrentAlarmContextAsync(),
+        ExpoAlarm.getPendingNativeAlarmHandoffAsync(),
+        ExpoAlarm.getPendingAlarmActionsAsync(),
+        ExpoAlarm.getNativeAlarmDebugStateAsync(nextAlarmId),
+      ]);
+
+      const nextSnapshot = {
+        permissions,
+        scheduled,
+        currentContext,
+        pendingHandoff,
+        pendingActions,
+        debug,
+      };
+      setSnapshot(nextSnapshot);
+      appendLog('inspect', nextSnapshot);
+      return nextSnapshot;
+    },
+    [alarmId, appendLog]
+  );
+
+  useEffect(() => {
+    const triggered = ExpoAlarm.addListener('onAlarmTriggered', (event) => {
+      appendLog('event:onAlarmTriggered', event);
+      if (event.id) {
+        setAlarmId(event.id);
+      }
+    });
+    const action = ExpoAlarm.addListener('onAlarmAction', (event) => {
+      appendLog('event:onAlarmAction', event);
+      if (event.alarmId) {
+        setAlarmId(event.alarmId);
+      }
+    });
+    const state = ExpoAlarm.addListener('onAlarmStateChange', (event) => {
+      appendLog('event:onAlarmStateChange', event);
+      if (event.id) {
+        setAlarmId(event.id);
+      }
+    });
+
+    inspect().catch((error) => appendLog('initial inspect failed', String(error)));
+
+    return () => {
+      triggered.remove();
+      action.remove();
+      state.remove();
+    };
+  }, [appendLog, inspect]);
+
+  const currentAlarmId = useMemo(() => {
+    return (
+      snapshot.pendingHandoff?.alarmId ||
+      snapshot.currentContext?.metadata?.alarmId?.toString() ||
+      snapshot.currentContext?.id ||
+      alarmId
+    );
+  }, [alarmId, snapshot.currentContext, snapshot.pendingHandoff]);
+
+  const schedulePrimary = useCallback(async () => {
+    await ExpoAlarm.cancelNativeAlarmBackupAsync(TEST_ALARM_ID);
+    await ExpoAlarm.cancelAlarmAsync(TEST_ALARM_ID);
+    await ExpoAlarm.clearPendingAlarmActionsAsync();
+    await ExpoAlarm.clearPendingNativeAlarmHandoffAsync();
+    await ExpoAlarm.resetNativeAlarmCompletionAsync(TEST_ALARM_ID);
+
+    const nextMinute = new Date(Date.now() + 70_000);
+    const scheduled = await ExpoAlarm.scheduleAlarmAsync({
+      id: TEST_ALARM_ID,
+      hour: nextMinute.getHours(),
+      minute: nextMinute.getMinutes(),
+      title: 'AlarmKit package test',
+      ios: {
+        alertTitle: 'AlarmKit package test',
+        metadata: {
+          alarmId: TEST_ALARM_ID,
+          source: 'example',
+        },
+        alertActionMode: 'default',
+        stopButtonTitle: 'Open',
+        stopIntentBehavior: 'rescheduleImmediate',
+        secondaryButtonTitle: 'Open',
+        secondaryButtonBehavior: 'openApp',
+      },
+    });
+
+    setAlarmId(scheduled.id);
+    appendLog('scheduled primary', scheduled);
+    await inspect(scheduled.id);
+  }, [appendLog, inspect]);
+
+  const armBackupFromCurrentState = useCallback(async () => {
+    const state = await inspect(currentAlarmId);
+    const handoffAlarmId = state.pendingHandoff?.alarmId;
+    const contextAlarmId =
+      state.currentContext?.metadata?.alarmId?.toString() ||
+      state.currentContext?.id;
+    const id = handoffAlarmId || contextAlarmId || currentAlarmId;
+    const result = await ExpoAlarm.scheduleNativeAlarmBackupAsync(id, 0.1);
+    setAlarmId(id);
+    appendLog('backup armed', result);
+    await inspect(id);
+  }, [appendLog, currentAlarmId, inspect]);
+
+  const completeAndCancel = useCallback(async () => {
+    await ExpoAlarm.completeNativeAlarmAsync(currentAlarmId);
+    await ExpoAlarm.cancelAlarmAsync(currentAlarmId);
+    appendLog('completed and canceled', { alarmId: currentAlarmId });
+    await inspect(currentAlarmId);
+  }, [appendLog, currentAlarmId, inspect]);
+
+  const clearState = useCallback(async () => {
+    await ExpoAlarm.cancelNativeAlarmBackupAsync(currentAlarmId);
+    await ExpoAlarm.cancelAlarmAsync(currentAlarmId);
+    await ExpoAlarm.clearPendingAlarmActionsAsync();
+    await ExpoAlarm.clearPendingNativeAlarmHandoffAsync();
+    await ExpoAlarm.resetNativeAlarmCompletionAsync(currentAlarmId);
+    appendLog('cleared state', { alarmId: currentAlarmId });
+    await inspect(currentAlarmId);
+  }, [appendLog, currentAlarmId, inspect]);
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.container}>
         <Text style={styles.header}>Expo Alarm</Text>
+        <Text style={styles.subheader}>AlarmKit package harness</Text>
         <Group name="Permissions">
-          <Button
-            title="Check permissions"
-            onPress={async () => {
-              console.log(await ExpoAlarm.getPermissionsAsync());
-            }}
-          />
           <Button
             title="Request permissions"
             onPress={async () => {
-              console.log(await ExpoAlarm.requestPermissionsAsync());
+              const result = await ExpoAlarm.requestPermissionsAsync();
+              appendLog('permissions requested', result);
+              await inspect();
             }}
           />
+          <Button title="Inspect native state" onPress={() => inspect()} />
         </Group>
-        <Group name="Native schedule">
-          <Button
-            title="Schedule alarm for next minute"
-            onPress={async () => {
-              const nextMinute = new Date(Date.now() + 60_000);
-              console.log(await ExpoAlarm.scheduleAlarmAsync({
-                hour: nextMinute.getHours(),
-                minute: nextMinute.getMinutes(),
-                title: 'Expo Alarm example',
-                ios: {
-                  metadata: {
-                    mission: 'example',
-                  },
-                  alertTitle: 'Expo Alarm example',
-                  stopButtonTitle: 'Stop',
-                  secondaryButtonTitle: 'Open Mission',
-                  stopIntentBehavior: 'openApp',
-                  secondaryButtonBehavior: 'openApp',
-                },
-              }));
-            }}
-          />
-          <Button
-            title="Read current alarm context"
-            onPress={async () => {
-              console.log(await ExpoAlarm.getCurrentAlarmContextAsync());
-            }}
-          />
-          <Button
-            title="Read pending alarm actions"
-            onPress={async () => {
-              console.log(await ExpoAlarm.getPendingAlarmActionsAsync());
-            }}
-          />
-          <Button
-            title="Clear pending alarm actions"
-            onPress={async () => {
-              await ExpoAlarm.clearPendingAlarmActionsAsync();
-            }}
-          />
+        <Group name="AlarmKit loop">
+          <Text style={styles.mono}>alarmId: {currentAlarmId}</Text>
+          <Button title="Schedule primary for next minute" onPress={schedulePrimary} />
+          <Button title="Arm backup from current handoff/context" onPress={armBackupFromCurrentState} />
+          <Button title="Complete and cancel" onPress={completeAndCancel} />
+          <Button title="Clear state" onPress={clearState} />
         </Group>
-        <Group name="Events">
-          <Text>{alarmEvent ? JSON.stringify(alarmEvent) : 'No alarm event yet'}</Text>
+        <Group name="Snapshot">
+          <Text style={styles.mono}>{JSON.stringify(snapshot, null, 2)}</Text>
+        </Group>
+        <Group name="Event log">
+          {events.length === 0 ? (
+            <Text>No events yet</Text>
+          ) : (
+            events.map((event, index) => (
+              <Text key={`${index}-${event.slice(0, 20)}`} style={styles.mono}>
+                {event}
+              </Text>
+            ))
+          )}
         </Group>
         {Platform.OS === 'android' ? (
           <Group name="Android Clock">
@@ -82,7 +224,7 @@ export default function App() {
   );
 }
 
-function Group(props: { name: string; children: React.ReactNode }) {
+function Group(props: { name: string; children: ReactNode }) {
   return (
     <View style={styles.group}>
       <Text style={styles.groupHeader}>{props.name}</Text>
@@ -94,17 +236,28 @@ function Group(props: { name: string; children: React.ReactNode }) {
 const styles = {
   header: {
     fontSize: 30,
-    margin: 20,
+    marginHorizontal: 20,
+    marginTop: 20,
+  },
+  subheader: {
+    fontSize: 16,
+    marginHorizontal: 20,
+    marginTop: 4,
   },
   groupHeader: {
     fontSize: 20,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   group: {
     margin: 20,
     backgroundColor: '#fff',
     borderRadius: 10,
     padding: 20,
+    gap: 12,
+  },
+  mono: {
+    fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }),
+    fontSize: 12,
   },
   container: {
     flex: 1,

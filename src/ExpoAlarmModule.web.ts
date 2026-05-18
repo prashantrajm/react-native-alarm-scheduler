@@ -50,6 +50,12 @@ class ExpoAlarmModule extends NativeModule<ExpoAlarmModuleEvents> {
 
   async clearPendingAlarmActionsAsync(_ids?: string[]): Promise<void> {}
 
+  async getPendingNativeAlarmHandoffAsync(): Promise<AlarmAction | null> {
+    return null;
+  }
+
+  async clearPendingNativeAlarmHandoffAsync(): Promise<void> {}
+
   async completeNativeAlarmAsync(_alarmId: string): Promise<void> {}
 
   async scheduleNativeAlarmBackupAsync(
@@ -80,6 +86,8 @@ class ExpoAlarmModule extends NativeModule<ExpoAlarmModuleEvents> {
       isComplete: false,
       activeRetryAlarmIds: [],
       pendingActions: [],
+      pendingHandoff: null,
+      intentDebugCounts: {},
       currentContext: null,
       alertActionMode: "default",
       stopButtonIncluded: false,

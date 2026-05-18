@@ -12,7 +12,7 @@ Native alarm scheduling for React Native and Expo apps with Android exact alarms
 - iOS AlarmKit metadata and presentation options for app-resolved alarm routing.
 - iOS AlarmKit App Intent actions for native stop and secondary alarm buttons.
 - iOS AlarmKit default or named custom alert sounds.
-- iOS AlarmKit backup timer helpers for mission-gated alarm flows.
+- iOS AlarmKit backup timer helpers for completion-gated alarm flows.
 - Config plugin for Android permissions and `NSAlarmKitUsageDescription`.
 - Typed TypeScript API for React Native and Expo apps.
 - Explicit unsupported behavior for platforms or OS versions that cannot schedule native alarms.
@@ -84,7 +84,7 @@ Plugin options:
 | `addNotificationPermission` | `boolean` | `true` | Adds `android.permission.POST_NOTIFICATIONS`. |
 | `iosAlarmSounds` | `string[]` | `[]` | Adds custom sound files to the iOS app bundle Resources build phase so AlarmKit can resolve them by filename. |
 
-The plugin also adds `com.android.alarm.permission.SET_ALARM` for Android system Clock alarm intents.
+The plugin also enables `NSSupportsLiveActivities` for iOS AlarmKit intents and adds `com.android.alarm.permission.SET_ALARM` for Android system Clock alarm intents.
 
 Then rebuild native projects:
 
@@ -111,11 +111,11 @@ if (permissions.canScheduleExactAlarms) {
     weekdays: [1, 2, 3, 4, 5],
     ios: {
       metadata: {
-        mission: 'math',
+        route: 'alarm-detail',
       },
       alertTitle: 'Morning alarm',
       alertActionMode: 'openMissionOnly',
-      secondaryButtonTitle: 'Open Mission',
+      secondaryButtonTitle: 'Open',
       stopIntentBehavior: 'rescheduleImmediate',
       secondaryButtonBehavior: 'openApp',
     },
@@ -237,7 +237,7 @@ Notes:
 - `ios.stopIntentBehavior: 'openApp'` records `nativeStop` and asks iOS to foreground the app immediately. The action record includes `foregroundRequested: true`; iOS does not provide a reliable success callback to the package.
 - `ios.stopIntentBehavior: 'rescheduleImmediate'` records `nativeStop`, asks iOS to foreground the app, and attempts to schedule a short backup AlarmKit timer until JS calls `completeNativeAlarmAsync(alarmId)` or `clearBypassAsync(alarmId)`. Backup alarms use a deterministic native UUID derived from the original logical `alarmId`, so each re-arm cancels/replaces the previous backup instead of accumulating retry alarms.
 - `ios.secondaryButtonBehavior: 'openApp'` installs a built-in AlarmKit App Intent that records `secondaryOpen` and asks iOS to open the app. Use `recordOnly` to record without foregrounding, or `none` to omit the secondary intent.
-- AlarmKit may still expose system-owned close/stop affordances that do not invoke package App Intents. Use `getNativeAlarmDebugStateAsync(alarmId)` to inspect which alert initializer and buttons were used, and treat strict mission enforcement as limited by public AlarmKit APIs.
+- AlarmKit may still expose system-owned close/stop affordances that do not invoke package App Intents. Use `getNativeAlarmDebugStateAsync(alarmId)` to inspect which alert initializer and buttons were used, and treat strict completion enforcement as limited by public AlarmKit APIs.
 
 ### `cancelAlarmAsync(id)`
 
@@ -282,7 +282,26 @@ type AlarmAction = {
 };
 ```
 
-`nativeStop` means the user pressed the system alarm stop control. Treat it as a bypass signal, not as mission completion.
+`nativeStop` means the user pressed the system alarm stop control. Treat it as a bypass signal, not as successful completion.
+
+### `getPendingNativeAlarmHandoffAsync()`
+
+iOS only. Returns the latest native AlarmKit intent handoff recorded by the package, or `null` if none exists. This is a single durable handoff slot written directly by the native App Intent before JS listeners run, and is useful for app-launch routing:
+
+```ts
+const handoff = await ExpoAlarm.getPendingNativeAlarmHandoffAsync();
+
+if (handoff?.action === 'nativeStop' || handoff?.action === 'secondaryOpen') {
+  await ExpoAlarm.scheduleNativeAlarmBackupAsync(handoff.alarmId, 0.1);
+  // route to your alarm handling UI
+}
+```
+
+Use `clearPendingNativeAlarmHandoffAsync()` after your app has consumed the handoff.
+
+### `clearPendingNativeAlarmHandoffAsync()`
+
+Clears the durable native handoff slot. This does not clear the full action history returned by `getPendingAlarmActionsAsync()`.
 
 ### `clearPendingAlarmActionsAsync(ids?)`
 
@@ -330,6 +349,8 @@ type NativeAlarmDebugState = {
   isComplete: boolean;
   activeRetryAlarmIds: string[];
   pendingActions: AlarmAction[];
+  pendingHandoff?: AlarmAction | null;
+  intentDebugCounts?: Record<string, number>;
   currentContext: AlarmContext | null;
   alertActionMode?: 'default' | 'openMissionOnly';
   stopButtonIncluded?: boolean;
@@ -394,7 +415,7 @@ iOS alarm scheduling uses AlarmKit. The app must:
 
 Older iOS versions return `status: 'unavailable'`.
 
-AlarmKit does not expose Android-style `Intent` or `PendingIntent` launch routing. For route-specific behavior, put route context such as `alarmId` or `mission` in `ios.metadata`, then call `getCurrentAlarmContextAsync()` and `getPendingAlarmActionsAsync()` on app launch or resume and navigate from JavaScript. Foreground listeners such as `onAlarmAction` and `onAlarmStateChange` are best effort; apps should reconcile from the async getters after launch.
+AlarmKit does not expose Android-style `Intent` or `PendingIntent` launch routing. For route-specific behavior, put route context such as `alarmId` or a screen name in `ios.metadata`, then call `getCurrentAlarmContextAsync()` and `getPendingAlarmActionsAsync()` on app launch or resume and navigate from JavaScript. Foreground listeners such as `onAlarmAction` and `onAlarmStateChange` are best effort; apps should reconcile from the async getters after launch.
 
 ## Development
 
