@@ -6,6 +6,16 @@
 
 ### 🎉 New features
 
+### 🐛 Bug fixes
+
+### 💡 Others
+
+## 0.1.6
+
+### 🛠 Breaking changes
+
+### 🎉 New features
+
 - Add iOS AlarmKit `ios.soundName` support for named custom alert sounds.
 - Add config plugin `iosAlarmSounds` support for bundling custom iOS alarm sound files.
 - Add deterministic iOS AlarmKit backup timer scheduling/canceling APIs for completion-gated native alarm flows.
