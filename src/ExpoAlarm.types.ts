@@ -33,6 +33,7 @@ export type IosAlarmOptions = {
   countdownTitle?: string;
   stopIntentBehavior?: "recordOnly" | "openApp" | "rescheduleImmediate";
   secondaryButtonBehavior?: "openApp" | "recordOnly" | "none";
+  soundName?: string;
 };
 
 export type AlarmActionType =
@@ -50,6 +51,9 @@ export type AlarmAction = {
   rescheduled?: boolean;
   rescheduledAlarmId?: string;
   retryScheduledFor?: number;
+  backupAlarmId?: string;
+  backupScheduledFor?: number;
+  backupDelaySeconds?: number;
 };
 
 export type AlarmScheduleInput = {
@@ -84,6 +88,7 @@ export type AlarmContext = {
   id: string;
   metadata?: AlarmMetadata;
   state?: AlarmContextState;
+  nativeAlarmId?: string;
 };
 
 export type AlarmStateChange = {
@@ -106,4 +111,14 @@ export type NativeAlarmDebugState = {
   stopIntentBehavior?: "recordOnly" | "openApp" | "rescheduleImmediate";
   alertInitializer?: "secondaryOnly" | "legacyStopButton";
   runtimeSupportsSecondaryOnlyAlert?: boolean;
+  sound?: "default" | "named";
+  soundName?: string;
+};
+
+export type NativeAlarmBackupResult = {
+  alarmId: string;
+  backupAlarmId: string;
+  scheduled: boolean;
+  scheduledFor?: number;
+  delaySeconds: number;
 };

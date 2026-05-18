@@ -6,7 +6,13 @@
 
 ### 🎉 New features
 
+- Add iOS AlarmKit `ios.soundName` support for named custom alert sounds.
+- Add config plugin `iosAlarmSounds` support for bundling custom iOS alarm sound files.
+- Add deterministic iOS AlarmKit backup timer scheduling/canceling APIs for completion-gated native alarm flows.
+
 ### 🐛 Bug fixes
+
+- Replace fresh iOS retry alarm UUIDs with a cancel-before-replace deterministic backup id for `rescheduleImmediate`.
 
 ### 💡 Others
 

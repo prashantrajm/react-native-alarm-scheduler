@@ -31,6 +31,7 @@ class IosAlarmOptionsRecord : Record {
   @Field var countdownTitle: String? = null
   @Field var stopIntentBehavior: String? = null
   @Field var secondaryButtonBehavior: String? = null
+  @Field var soundName: String? = null
 }
 
 class ExpoAlarmModule : Module() {
@@ -99,6 +100,19 @@ class ExpoAlarmModule : Module() {
       null
     }
 
+    AsyncFunction("scheduleNativeAlarmBackupAsync") { alarmId: String, delaySeconds: Double? ->
+      mapOf(
+        "alarmId" to alarmId,
+        "backupAlarmId" to "",
+        "scheduled" to false,
+        "delaySeconds" to (delaySeconds ?: 0.1)
+      )
+    }
+
+    AsyncFunction("cancelNativeAlarmBackupAsync") { _: String ->
+      false
+    }
+
     AsyncFunction("clearBypassAsync") { _: String ->
       null
     }
@@ -120,7 +134,8 @@ class ExpoAlarmModule : Module() {
         "secondaryButtonBehavior" to "none",
         "stopIntentBehavior" to "recordOnly",
         "alertInitializer" to "legacyStopButton",
-        "runtimeSupportsSecondaryOnlyAlert" to false
+        "runtimeSupportsSecondaryOnlyAlert" to false,
+        "sound" to "default"
       )
     }
 

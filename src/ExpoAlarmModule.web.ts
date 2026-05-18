@@ -6,6 +6,7 @@ import type {
   AlarmContext,
   AlarmScheduleInput,
   ExpoAlarmModuleEvents,
+  NativeAlarmBackupResult,
   NativeAlarmDebugState,
   ScheduledAlarm,
 } from "./ExpoAlarm.types";
@@ -51,6 +52,22 @@ class ExpoAlarmModule extends NativeModule<ExpoAlarmModuleEvents> {
 
   async completeNativeAlarmAsync(_alarmId: string): Promise<void> {}
 
+  async scheduleNativeAlarmBackupAsync(
+    alarmId: string,
+    delaySeconds = 0.1,
+  ): Promise<NativeAlarmBackupResult> {
+    return {
+      alarmId,
+      backupAlarmId: "",
+      scheduled: false,
+      delaySeconds,
+    };
+  }
+
+  async cancelNativeAlarmBackupAsync(_alarmId: string): Promise<boolean> {
+    return false;
+  }
+
   async clearBypassAsync(_alarmId: string): Promise<void> {}
 
   async resetNativeAlarmCompletionAsync(_alarmId: string): Promise<void> {}
@@ -71,6 +88,7 @@ class ExpoAlarmModule extends NativeModule<ExpoAlarmModuleEvents> {
       stopIntentBehavior: "recordOnly",
       alertInitializer: "legacyStopButton",
       runtimeSupportsSecondaryOnlyAlert: false,
+      sound: "default",
     };
   }
 

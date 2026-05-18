@@ -11,6 +11,8 @@ Native alarm scheduling for React Native and Expo apps with Android exact alarms
 - iOS native alarm scheduling through AlarmKit on iOS 26+.
 - iOS AlarmKit metadata and presentation options for app-resolved alarm routing.
 - iOS AlarmKit App Intent actions for native stop and secondary alarm buttons.
+- iOS AlarmKit default or named custom alert sounds.
+- iOS AlarmKit backup timer helpers for mission-gated alarm flows.
 - Config plugin for Android permissions and `NSAlarmKitUsageDescription`.
 - Typed TypeScript API for React Native and Expo apps.
 - Explicit unsupported behavior for platforms or OS versions that cannot schedule native alarms.
@@ -23,10 +25,12 @@ Native alarm scheduling for React Native and Expo apps with Android exact alarms
 | Request alarm authorization | Yes. Opens exact alarm settings on Android 12+ when needed. | Yes on iOS 26+ through AlarmKit. | `requestPermissionsAsync()` |
 | Open alarm/app settings | Yes. Opens exact alarm or app settings. | Yes. Opens app settings. | `openAlarmSettingsAsync()` |
 | Schedule an app-owned alarm | Yes. Uses `AlarmManager.setAlarmClock` for user-visible alarms. | Yes on iOS 26+ through AlarmKit. | `scheduleAlarmAsync()` |
+| Set native alarm sound | Default alarm sound. | Default or named custom AlarmKit sound. | `ios.soundName` |
 | Cancel an app-owned alarm | Yes. Cancels alarms created by this package. | Yes on iOS 26+ for alarms created by this package. | `cancelAlarmAsync(id)` |
 | List app-owned alarms | Stored by this package. Android does not expose all system Clock alarms to apps. | Stored by this package. iOS does not expose all Clock app alarms to apps. | `getScheduledAlarmsAsync()` |
 | Read current alarm context | No. Android alarm launches use the app launcher intent. | Yes. Uses package-stored metadata plus AlarmKit alarm state when available. | `getCurrentAlarmContextAsync()` |
 | Read native alarm actions | No. | Yes. Records built-in AlarmKit App Intent actions for native stop and secondary buttons. | `getPendingAlarmActionsAsync()` |
+| Schedule/cancel a native backup alarm | No-op. | Yes on iOS 26+ through a deterministic AlarmKit backup timer id. | `scheduleNativeAlarmBackupAsync()`, `cancelNativeAlarmBackupAsync()` |
 | Create an alarm in the system Clock app | Yes. Uses `AlarmClock.ACTION_SET_ALARM`. | No public iOS API exists for creating Clock app alarms. | `setSystemAlarmAsync()` on Android only |
 | Open the system alarm app | Yes. Uses `AlarmClock.ACTION_SHOW_ALARMS`. | Best effort only through a Clock URL; iOS may ignore it. | `openSystemAlarmAppAsync()` |
 | Fire JS event when an alarm triggers | Limited by app process state. | Limited by app process state. | `onAlarmTriggered` is declared; Android also shows a native notification. |
@@ -62,7 +66,8 @@ Add the config plugin to your app config before running `expo prebuild`:
         {
           "alarmKitUsageDescription": "Allow this app to schedule alarms.",
           "addExactAlarmPermission": true,
-          "addNotificationPermission": true
+          "addNotificationPermission": true,
+          "iosAlarmSounds": ["./assets/audio/bollywood-alarm.mp3"]
         }
       ]
     ]
@@ -77,6 +82,7 @@ Plugin options:
 | `alarmKitUsageDescription` | `string` | `Allow this app to schedule alarms that can alert you at the selected time.` | Adds `NSAlarmKitUsageDescription` for iOS AlarmKit authorization. |
 | `addExactAlarmPermission` | `boolean` | `true` | Adds `android.permission.SCHEDULE_EXACT_ALARM`. |
 | `addNotificationPermission` | `boolean` | `true` | Adds `android.permission.POST_NOTIFICATIONS`. |
+| `iosAlarmSounds` | `string[]` | `[]` | Adds custom sound files to the iOS app bundle Resources build phase so AlarmKit can resolve them by filename. |
 
 The plugin also adds `com.android.alarm.permission.SET_ALARM` for Android system Clock alarm intents.
 
@@ -198,6 +204,7 @@ type AlarmScheduleInput = {
     countdownTitle?: string;
     stopIntentBehavior?: 'recordOnly' | 'openApp' | 'rescheduleImmediate';
     secondaryButtonBehavior?: 'openApp' | 'recordOnly' | 'none';
+    soundName?: string;
   };
 };
 
@@ -224,10 +231,11 @@ Notes:
 - iOS AlarmKit requires `id` to be a UUID string when you provide one.
 - `ios.metadata` is stored by the package and included in AlarmKit metadata. The package always adds `alarmId` and `title`.
 - iOS presentation options customize AlarmKit text only. They are not Android-style launch intents and do not force a React Native route.
+- `ios.soundName` maps to AlarmKit's `AlertConfiguration.AlertSound.named(soundName)`. Omit it to use the system default sound. The sound name should be the exact bundled filename, including the extension, for example `bollywood-alarm.mp3`. In Expo apps, add the file path to the config plugin's `iosAlarmSounds` array so prebuild adds it to the iOS app bundle.
 - `ios.alertActionMode: 'openMissionOnly'` prefers AlarmKit's newer secondary-only alert presentation when the runtime supports it. This omits the package-configured stop button and makes the secondary button the visible app action.
 - `ios.stopIntentBehavior: 'recordOnly'` installs a built-in AlarmKit App Intent that records a `nativeStop` action when the system stop control is pressed.
 - `ios.stopIntentBehavior: 'openApp'` records `nativeStop` and asks iOS to foreground the app immediately. The action record includes `foregroundRequested: true`; iOS does not provide a reliable success callback to the package.
-- `ios.stopIntentBehavior: 'rescheduleImmediate'` records `nativeStop`, asks iOS to foreground the app, and attempts to schedule a retry alarm for the next available minute until JS calls `completeNativeAlarmAsync(alarmId)` or `clearBypassAsync(alarmId)`. Retry alarms use fresh native UUID ids while keeping the original logical `alarmId` in metadata.
+- `ios.stopIntentBehavior: 'rescheduleImmediate'` records `nativeStop`, asks iOS to foreground the app, and attempts to schedule a short backup AlarmKit timer until JS calls `completeNativeAlarmAsync(alarmId)` or `clearBypassAsync(alarmId)`. Backup alarms use a deterministic native UUID derived from the original logical `alarmId`, so each re-arm cancels/replaces the previous backup instead of accumulating retry alarms.
 - `ios.secondaryButtonBehavior: 'openApp'` installs a built-in AlarmKit App Intent that records `secondaryOpen` and asks iOS to open the app. Use `recordOnly` to record without foregrounding, or `none` to omit the secondary intent.
 - AlarmKit may still expose system-owned close/stop affordances that do not invoke package App Intents. Use `getNativeAlarmDebugStateAsync(alarmId)` to inspect which alert initializer and buttons were used, and treat strict mission enforcement as limited by public AlarmKit APIs.
 
@@ -248,10 +256,11 @@ type AlarmContext = {
   id: string;
   metadata?: Record<string, string | number | boolean>;
   state?: 'scheduled' | 'alerting' | 'countdown' | 'paused';
+  nativeAlarmId?: string;
 };
 ```
 
-On iOS 26+, this reads AlarmKit alarms owned by the app and joins them with metadata stored by this package. If a one-shot alarm recently fired and AlarmKit already removed it from the daemon store, the package can still return the stored metadata for a short recovery window. On Android and Web this returns `null`.
+On iOS 26+, this reads AlarmKit alarms owned by the app and joins them with metadata stored by this package. If the active native alarm is the deterministic backup timer, `id` remains the original logical alarm id and `nativeAlarmId` contains the backup UUID. If a one-shot alarm recently fired and AlarmKit already removed it from the daemon store, the package can still return the stored metadata for a short recovery window. On Android and Web this returns `null`.
 
 ### `getPendingAlarmActionsAsync()`
 
@@ -267,6 +276,9 @@ type AlarmAction = {
   rescheduled?: boolean;
   rescheduledAlarmId?: string;
   retryScheduledFor?: number;
+  backupAlarmId?: string;
+  backupScheduledFor?: number;
+  backupDelaySeconds?: number;
 };
 ```
 
@@ -278,7 +290,27 @@ Clears pending native action records. Pass action record `id` values to clear sp
 
 ### `completeNativeAlarmAsync(alarmId)`
 
-Marks the native alarm flow complete for `rescheduleImmediate`. Call this only after the user satisfies your app's mission. This stops future native stop intents from scheduling retry alarms for that `alarmId`, cancels the original native alarm when active, cancels retry alarms tracked for that logical alarm id, and clears pending native action records for that alarm.
+Marks the native alarm flow complete for `rescheduleImmediate`. Call this only after the user satisfies your app's completion condition. This stops future native stop intents from scheduling backup alarms for that `alarmId`, cancels the original native alarm when active, cancels the deterministic backup alarm and any legacy tracked retry alarms for that logical alarm id, and clears pending native action records for that alarm.
+
+### `scheduleNativeAlarmBackupAsync(alarmId, delaySeconds?)`
+
+iOS 26+ only. Schedules a short AlarmKit backup timer for an existing logical alarm id and returns:
+
+```ts
+type NativeAlarmBackupResult = {
+  alarmId: string;
+  backupAlarmId: string;
+  scheduled: boolean;
+  scheduledFor?: number;
+  delaySeconds: number;
+};
+```
+
+The backup id is deterministic for the primary alarm id. Calling this repeatedly cancels/replaces the same backup timer. This is useful when your app processes a native alarm handoff from `getPendingAlarmActionsAsync()` or finds an alerting alarm from `getCurrentAlarmContextAsync()` and needs to re-arm before presenting app UI.
+
+### `cancelNativeAlarmBackupAsync(alarmId)`
+
+iOS 26+ only. Cancels the deterministic backup timer for a logical alarm id and removes any legacy retry ids tracked by older package versions.
 
 ### `clearBypassAsync(alarmId)`
 
@@ -306,6 +338,8 @@ type NativeAlarmDebugState = {
   stopIntentBehavior?: 'recordOnly' | 'openApp' | 'rescheduleImmediate';
   alertInitializer?: 'secondaryOnly' | 'legacyStopButton';
   runtimeSupportsSecondaryOnlyAlert?: boolean;
+  sound?: 'default' | 'named';
+  soundName?: string;
 };
 ```
 
