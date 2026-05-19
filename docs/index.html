@@ -20,7 +20,7 @@
         <a href="#install">Install</a>
         <a href="#usage">Usage</a>
         <a href="#ios">iOS</a>
-        <a href="#api">API</a>
+        <a href="./api.html">API docs</a>
         <a href="https://github.com/rajmaurya-dev/react-native-alarm-scheduler">GitHub</a>
       </nav>
     </header>
@@ -37,6 +37,7 @@
           </p>
           <div class="hero-actions">
             <a class="button primary" href="#install">Get started</a>
+            <a class="button" href="./api.html">Read API docs</a>
             <a class="button" href="https://www.npmjs.com/package/react-native-alarm-scheduler">npm package</a>
           </div>
         </div>
@@ -213,16 +214,20 @@ await ExpoAlarm.cancelAlarmAsync(alarmId);</code></pre>
         <div class="section-heading">
           <p class="eyebrow">API</p>
           <h2>Core methods</h2>
+          <p>
+            Use the full API reference for method signatures, return values,
+            examples, platform behavior, and cleanup order.
+          </p>
         </div>
         <div class="api-table">
-          <div><code>getPermissionsAsync()</code><span>Read native alarm capability and authorization state.</span></div>
-          <div><code>requestPermissionsAsync()</code><span>Request or open the native permission surface where possible.</span></div>
-          <div><code>scheduleAlarmAsync(alarm)</code><span>Schedule an app-owned native alarm.</span></div>
-          <div><code>cancelAlarmAsync(id)</code><span>Cancel a scheduled or active app-owned alarm.</span></div>
-          <div><code>getCurrentAlarmContextAsync()</code><span>Read the active AlarmKit context when available.</span></div>
-          <div><code>getPendingAlarmActionsAsync()</code><span>Read recorded native action history.</span></div>
-          <div><code>getPendingNativeAlarmHandoffAsync()</code><span>Read the latest durable iOS native handoff.</span></div>
-          <div><code>getNativeAlarmDebugStateAsync(id)</code><span>Inspect retry ids, handoff state, and AlarmKit presentation metadata.</span></div>
+          <a href="./api.html#permissions"><code>getPermissionsAsync()</code><span>Read native alarm capability and authorization state.</span></a>
+          <a href="./api.html#request-permissions"><code>requestPermissionsAsync()</code><span>Request or open the native permission surface where possible.</span></a>
+          <a href="./api.html#schedule"><code>scheduleAlarmAsync(alarm)</code><span>Schedule an app-owned native alarm.</span></a>
+          <a href="./api.html#cancel"><code>cancelAlarmAsync(id)</code><span>Cancel a scheduled or active app-owned alarm.</span></a>
+          <a href="./api.html#current-context"><code>getCurrentAlarmContextAsync()</code><span>Read the active AlarmKit context when available.</span></a>
+          <a href="./api.html#pending-actions"><code>getPendingAlarmActionsAsync()</code><span>Read recorded native action history.</span></a>
+          <a href="./api.html#native-handoff"><code>getPendingNativeAlarmHandoffAsync()</code><span>Read the latest durable iOS native handoff.</span></a>
+          <a href="./api.html#debug-state"><code>getNativeAlarmDebugStateAsync(id)</code><span>Inspect retry ids, handoff state, and AlarmKit presentation metadata.</span></a>
         </div>
       </section>
     </main>

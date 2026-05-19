@@ -19,22 +19,22 @@ Native alarm scheduling for React Native and Expo apps with Android exact alarms
 
 ## Platform support
 
-| Capability | Android OS support | iOS OS support | Available in this package |
+| Capability | Android | iOS | Available in this package |
 | --- | --- | --- | --- |
-| Check alarm authorization/capability | Yes. Uses exact alarm capability checks where required. | Yes on iOS 26+ through AlarmKit authorization state. Older iOS reports unavailable. | `getPermissionsAsync()` |
-| Request alarm authorization | Yes. Opens exact alarm settings on Android 12+ when needed. | Yes on iOS 26+ through AlarmKit. | `requestPermissionsAsync()` |
-| Open alarm/app settings | Yes. Opens exact alarm or app settings. | Yes. Opens app settings. | `openAlarmSettingsAsync()` |
-| Schedule an app-owned alarm | Yes. Uses `AlarmManager.setAlarmClock` for user-visible alarms. | Yes on iOS 26+ through AlarmKit. | `scheduleAlarmAsync()` |
-| Set native alarm sound | Default alarm sound. | Default or named custom AlarmKit sound. | `ios.soundName` |
-| Cancel an app-owned alarm | Yes. Cancels alarms created by this package. | Yes on iOS 26+ for alarms created by this package. | `cancelAlarmAsync(id)` |
-| List app-owned alarms | Stored by this package. Android does not expose all system Clock alarms to apps. | Stored by this package. iOS does not expose all Clock app alarms to apps. | `getScheduledAlarmsAsync()` |
-| Read current alarm context | No. Android alarm launches use the app launcher intent. | Yes. Uses package-stored metadata plus AlarmKit alarm state when available. | `getCurrentAlarmContextAsync()` |
-| Read native alarm actions | No. | Yes. Records built-in AlarmKit App Intent actions for native stop and secondary buttons. | `getPendingAlarmActionsAsync()` |
-| Schedule/cancel a native backup alarm | No-op. | Yes on iOS 26+ through a deterministic AlarmKit backup timer id. | `scheduleNativeAlarmBackupAsync()`, `cancelNativeAlarmBackupAsync()` |
-| Create an alarm in the system Clock app | Yes. Uses `AlarmClock.ACTION_SET_ALARM`. | No public iOS API exists for creating Clock app alarms. | `setSystemAlarmAsync()` on Android only |
-| Open the system alarm app | Yes. Uses `AlarmClock.ACTION_SHOW_ALARMS`. | Best effort only through a Clock URL; iOS may ignore it. | `openSystemAlarmAppAsync()` |
-| Fire JS event when an alarm triggers | Limited by app process state. | Limited by app process state. | `onAlarmTriggered` is declared; Android also shows a native notification. |
-| Web support | Not applicable. | Not applicable. | No scheduling support; methods return unavailable or throw explicit unsupported errors. |
+| Check alarm authorization/capability | ✅ | ✅ | `getPermissionsAsync()` |
+| Request alarm authorization | ✅ | ✅ | `requestPermissionsAsync()` |
+| Open alarm/app settings | ✅ | ✅ | `openAlarmSettingsAsync()` |
+| Schedule an app-owned alarm | ✅ | ✅ | `scheduleAlarmAsync()` |
+| Set native alarm sound | ❌ | ✅ | `ios.soundName` |
+| Cancel an app-owned alarm | ✅ | ✅ | `cancelAlarmAsync(id)` |
+| List app-owned alarms | ✅ | ✅ | `getScheduledAlarmsAsync()` |
+| Read current alarm context | ❌ | ✅ | `getCurrentAlarmContextAsync()` |
+| Read native alarm actions | ❌ | ✅ | `getPendingAlarmActionsAsync()` |
+| Schedule/cancel a native backup alarm | ❌ | ✅ | `scheduleNativeAlarmBackupAsync()`, `cancelNativeAlarmBackupAsync()` |
+| Create an alarm in the system Clock app | ✅ | ❌ | `setSystemAlarmAsync()` |
+| Open the system alarm app | ✅ | ❌ | `openSystemAlarmAppAsync()` |
+| Fire JS event when an alarm triggers | ✅ | ✅ | `onAlarmTriggered` |
+| Web support | ❌ | ❌ | Explicit unavailable/no-op behavior |
 
 ## Requirements
 

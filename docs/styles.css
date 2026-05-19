@@ -303,7 +303,8 @@ pre {
   background: var(--panel);
 }
 
-.api-table div {
+.api-table div,
+.api-table a {
   display: grid;
   grid-template-columns: minmax(250px, 0.45fr) minmax(0, 1fr);
   gap: 18px;
@@ -311,12 +312,147 @@ pre {
   border-bottom: 1px solid var(--line);
 }
 
-.api-table div:last-child {
+.api-table div:last-child,
+.api-table a:last-child {
   border-bottom: 0;
 }
 
 .api-table span {
   color: var(--muted);
+}
+
+.api-table a:hover {
+  background: var(--panel-soft);
+}
+
+.docs-shell {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 56px;
+  width: min(1240px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 52px 0 88px;
+}
+
+.docs-sidebar {
+  position: sticky;
+  top: 96px;
+  align-self: start;
+  max-height: calc(100vh - 120px);
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.docs-sidebar a {
+  display: block;
+  padding: 9px 10px;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.docs-sidebar a:hover {
+  background: var(--panel-soft);
+  color: var(--ink);
+}
+
+.docs-content {
+  min-width: 0;
+}
+
+.docs-hero {
+  padding: 28px 0 48px;
+}
+
+.docs-hero h1 {
+  max-width: 900px;
+  font-size: clamp(48px, 7vw, 84px);
+}
+
+.reference-section {
+  padding: 44px 0;
+  border-top: 1px solid var(--line);
+}
+
+.reference-section > p {
+  max-width: 780px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.reference-section h2 {
+  font-size: clamp(30px, 4vw, 48px);
+}
+
+.reference-section h3 {
+  margin-top: 28px;
+}
+
+.method-header {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+  margin-bottom: 20px;
+}
+
+.method-header h2 {
+  margin-bottom: 8px;
+}
+
+.method-header p {
+  max-width: 760px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.step {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  font-weight: 800;
+}
+
+.method pre {
+  margin: 18px 0;
+  border-radius: 8px;
+}
+
+.method > code,
+.method p code,
+.reference-section p code {
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: var(--panel-soft);
+  color: var(--ink);
+}
+
+.note {
+  margin-top: 22px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.note strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.note p {
+  margin-bottom: 0;
+  color: var(--muted);
+  line-height: 1.6;
 }
 
 .footer {
@@ -375,9 +511,22 @@ pre {
     font-size: 18px;
   }
 
+  .docs-shell,
   .panel-grid,
-  .api-table div {
+  .api-table div,
+  .api-table a {
     grid-template-columns: 1fr;
+  }
+
+  .docs-shell {
+    gap: 24px;
+    width: min(100% - 32px, 760px);
+    padding-top: 28px;
+  }
+
+  .docs-sidebar {
+    position: static;
+    max-height: none;
   }
 
   .panel-grid div {

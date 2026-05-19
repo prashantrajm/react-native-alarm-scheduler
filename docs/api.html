@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="API reference for react-native-alarm-scheduler, including permissions, scheduling, AlarmKit handoffs, backup timers, cleanup, Android Clock intents, and events."
+    />
+    <title>API reference - react-native-alarm-scheduler</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="./index.html" aria-label="react-native-alarm-scheduler home">
+        <span class="brand-mark">EA</span>
+        <span>react-native-alarm-scheduler</span>
+      </a>
+      <nav class="nav" aria-label="Primary navigation">
+        <a href="./index.html">Overview</a>
+        <a href="#quickstart">Quickstart</a>
+        <a href="#methods">Methods</a>
+        <a href="#events">Events</a>
+        <a href="https://github.com/rajmaurya-dev/react-native-alarm-scheduler">GitHub</a>
+      </nav>
+    </header>
+
+    <main class="docs-shell">
+      <aside class="docs-sidebar" aria-label="API table of contents">
+        <a href="#quickstart">Quickstart</a>
+        <a href="#types">Shared types</a>
+        <a href="#permissions">1. getPermissionsAsync</a>
+        <a href="#request-permissions">2. requestPermissionsAsync</a>
+        <a href="#settings">3. openAlarmSettingsAsync</a>
+        <a href="#schedule">4. scheduleAlarmAsync</a>
+        <a href="#list">5. getScheduledAlarmsAsync</a>
+        <a href="#cancel">6. cancelAlarmAsync</a>
+        <a href="#current-context">7. getCurrentAlarmContextAsync</a>
+        <a href="#native-handoff">8. getPendingNativeAlarmHandoffAsync</a>
+        <a href="#clear-native-handoff">9. clearPendingNativeAlarmHandoffAsync</a>
+        <a href="#pending-actions">10. getPendingAlarmActionsAsync</a>
+        <a href="#clear-actions">11. clearPendingAlarmActionsAsync</a>
+        <a href="#backup">12. scheduleNativeAlarmBackupAsync</a>
+        <a href="#cancel-backup">13. cancelNativeAlarmBackupAsync</a>
+        <a href="#complete">14. completeNativeAlarmAsync</a>
+        <a href="#reset-completion">15. resetNativeAlarmCompletionAsync</a>
+        <a href="#debug-state">16. getNativeAlarmDebugStateAsync</a>
+        <a href="#android-clock">17. Android Clock methods</a>
+        <a href="#events">18. Events</a>
+      </aside>
+
+      <article class="docs-content">
+        <header class="docs-hero">
+          <p class="eyebrow">API reference</p>
+          <h1>Official method reference</h1>
+          <p class="lede">
+            Use this page in order. It starts with permissions, then scheduling,
+            then native alarm state reconciliation, and ends with cleanup,
+            Android Clock intents, and event listeners.
+          </p>
+        </header>
+
+        <section id="quickstart" class="reference-section">
+          <h2>Quickstart</h2>
+          <p>
+            Import the default native module object and call methods directly.
+            Event listeners are attached from the same object.
+          </p>
+          <pre><code>import ExpoAlarm from 'react-native-alarm-scheduler';
+
+const permissions = await ExpoAlarm.requestPermissionsAsync();
+
+if (permissions.canScheduleExactAlarms) {
+  await ExpoAlarm.scheduleAlarmAsync({
+    id: '00000000-0000-4000-8000-000000000001',
+    hour: 7,
+    minute: 30,
+    title: 'Morning alarm'
+  });
+}</code></pre>
+        </section>
+
+        <section id="types" class="reference-section">
+          <h2>Shared Types</h2>
+          <p>
+            These types are referenced by multiple methods below. Weekdays use
+            ISO numbering: Monday is <code>1</code>, Sunday is <code>7</code>.
+          </p>
+          <pre><code>type AlarmWeekday = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+type AlarmMetadataValue = string | number | boolean;
+type AlarmMetadata = Record&lt;string, AlarmMetadataValue&gt;;
+
+type AlarmAuthorizationStatus =
+  | 'authorized'
+  | 'denied'
+  | 'notDetermined'
+  | 'unavailable'
+  | 'unknown';</code></pre>
+        </section>
+
+        <section id="methods" class="reference-section">
+          <h2>Methods</h2>
+          <p>
+            The methods are ordered by a typical alarm lifecycle: capability
+            check, scheduling, runtime reconciliation, completion, and cleanup.
+          </p>
+        </section>
+
+        <section id="permissions" class="reference-section method">
+          <div class="method-header">
+            <span class="step">1</span>
+            <div>
+              <h2>getPermissionsAsync()</h2>
+              <p>Read the current native alarm capability and authorization state.</p>
+            </div>
+          </div>
+          <pre><code>const permissions = await ExpoAlarm.getPermissionsAsync();</code></pre>
+          <h3>Returns</h3>
+          <pre><code>type AlarmPermissionResponse = {
+  platform: 'android' | 'ios';
+  status: AlarmAuthorizationStatus;
+  canScheduleExactAlarms: boolean;
+  canOpenSettings: boolean;
+};</code></pre>
+          <div class="note">
+            <strong>Platform behavior</strong>
+            <p>
+              Android reports exact alarm capability. iOS returns authorized only
+              when AlarmKit is available and the app has authorization.
+            </p>
+          </div>
+        </section>
+
+        <section id="request-permissions" class="reference-section method">
+          <div class="method-header">
+            <span class="step">2</span>
+            <div>
+              <h2>requestPermissionsAsync()</h2>
+              <p>Request or open the native permission surface where possible.</p>
+            </div>
+          </div>
+          <pre><code>const permissions = await ExpoAlarm.requestPermissionsAsync();</code></pre>
+          <h3>Returns</h3>
+          <p><code>Promise&lt;AlarmPermissionResponse&gt;</code></p>
+          <div class="note">
+            <strong>Platform behavior</strong>
+            <p>
+              On Android 12+, this can open exact alarm settings. On iOS 26+,
+              this requests AlarmKit authorization.
+            </p>
+          </div>
+        </section>
+
+        <section id="settings" class="reference-section method">
+          <div class="method-header">
+            <span class="step">3</span>
+            <div>
+              <h2>openAlarmSettingsAsync()</h2>
+              <p>Open the relevant app or alarm settings screen.</p>
+            </div>
+          </div>
+          <pre><code>const opened = await ExpoAlarm.openAlarmSettingsAsync();</code></pre>
+          <h3>Returns</h3>
+          <p><code>Promise&lt;boolean&gt;</code></p>
+        </section>
+
+        <section id="schedule" class="reference-section method">
+          <div class="method-header">
+            <span class="step">4</span>
+            <div>
+              <h2>scheduleAlarmAsync(alarm)</h2>
+              <p>Schedule an app-owned native alarm.</p>
+            </div>
+          </div>
+          <pre><code>const scheduled = await ExpoAlarm.scheduleAlarmAsync({
+  id: '00000000-0000-4000-8000-000000000001',
+  hour: 7,
+  minute: 30,
+  title: 'Morning alarm',
+  weekdays: [1, 2, 3, 4, 5],
+  ios: {
+    alertTitle: 'Morning alarm',
+    stopButtonTitle: 'Open',
+    secondaryButtonTitle: 'Open',
+    stopIntentBehavior: 'rescheduleImmediate',
+    secondaryButtonBehavior: 'openApp',
+    soundName: 'bollywood-alarm.mp3',
+    metadata: {
+      route: 'alarm-detail'
+    }
+  }
+});</code></pre>
+          <h3>Input</h3>
+          <pre><code>type AlarmScheduleInput = {
+  id?: string;
+  hour: number;
+  minute: number;
+  title?: string;
+  weekdays?: AlarmWeekday[];
+  timestamp?: number;
+  showUi?: boolean;
+  ios?: IosAlarmOptions;
+};
+
+type IosAlarmOptions = {
+  metadata?: AlarmMetadata;
+  alertTitle?: string;
+  alertActionMode?: 'default' | 'openMissionOnly';
+  stopButtonTitle?: string;
+  secondaryButtonTitle?: string;
+  countdownTitle?: string;
+  stopIntentBehavior?: 'recordOnly' | 'openApp' | 'rescheduleImmediate';
+  secondaryButtonBehavior?: 'openApp' | 'recordOnly' | 'none';
+  soundName?: string;
+};</code></pre>
+          <h3>Returns</h3>
+          <pre><code>type ScheduledAlarm = {
+  id: string;
+  hour: number;
+  minute: number;
+  title: string;
+  weekdays: AlarmWeekday[];
+  timestamp: number;
+  platform: 'android' | 'ios';
+  metadata?: AlarmMetadata;
+};</code></pre>
+          <div class="note">
+            <strong>Important constraints</strong>
+            <p>
+              <code>hour</code> uses 24-hour time. <code>minute</code> must be
+              0-59. Android accepts any string id. iOS AlarmKit requires a UUID
+              string when you provide an id.
+            </p>
+          </div>
+        </section>
+
+        <section id="list" class="reference-section method">
+          <div class="method-header">
+            <span class="step">5</span>
+            <div>
+              <h2>getScheduledAlarmsAsync()</h2>
+              <p>Return app-owned alarms stored by this module.</p>
+            </div>
+          </div>
+          <pre><code>const alarms = await ExpoAlarm.getScheduledAlarmsAsync();</code></pre>
+          <h3>Returns</h3>
+          <p><code>Promise&lt;ScheduledAlarm[]&gt;</code></p>
+        </section>
+
+        <section id="cancel" class="reference-section method">
+          <div class="method-header">
+            <span class="step">6</span>
+            <div>
+              <h2>cancelAlarmAsync(id)</h2>
+              <p>Cancel an app-owned alarm by id.</p>
+            </div>
+          </div>
+          <pre><code>const removed = await ExpoAlarm.cancelAlarmAsync(alarmId);</code></pre>
+          <h3>Returns</h3>
+          <p><code>Promise&lt;boolean&gt;</code></p>
+          <div class="note">
+            <strong>Cleanup</strong>
+            <p>
+              For iOS completion-gated flows, call
+              <code>completeNativeAlarmAsync(alarmId)</code> before or alongside
+              cancellation so native retry state is also cleared.
+            </p>
+          </div>
+        </section>
+
+        <section id="current-context" class="reference-section method">
+          <div class="method-header">
+            <span class="step">7</span>
+            <div>
+              <h2>getCurrentAlarmContextAsync()</h2>
+              <p>Read the active AlarmKit context for launch or resume routing.</p>
+            </div>
+          </div>
+          <pre><code>const context = await ExpoAlarm.getCurrentAlarmContextAsync();
+
+if (context?.state === 'alerting' || context?.state === 'countdown') {
+  const alarmId = context.metadata?.alarmId?.toString() ?? context.id;
+}</code></pre>
+          <h3>Returns</h3>
+          <pre><code>type AlarmContext = {
+  id: string;
+  metadata?: AlarmMetadata;
+  state?: 'scheduled' | 'alerting' | 'countdown' | 'paused';
+  nativeAlarmId?: string;
+};</code></pre>
+          <p>
+            If the active native alarm is a deterministic backup timer,
+            <code>id</code> remains the original logical alarm id and
+            <code>nativeAlarmId</code> contains the backup UUID.
+          </p>
+        </section>
+
+        <section id="native-handoff" class="reference-section method">
+          <div class="method-header">
+            <span class="step">8</span>
+            <div>
+              <h2>getPendingNativeAlarmHandoffAsync()</h2>
+              <p>Read the latest durable iOS AlarmKit intent handoff.</p>
+            </div>
+          </div>
+          <pre><code>const handoff = await ExpoAlarm.getPendingNativeAlarmHandoffAsync();
+
+if (handoff?.action === 'nativeStop' || handoff?.action === 'secondaryOpen') {
+  await ExpoAlarm.clearPendingNativeAlarmHandoffAsync();
+  // Navigate using handoff.alarmId.
+}</code></pre>
+          <h3>Returns</h3>
+          <p><code>Promise&lt;AlarmAction | null&gt;</code></p>
+          <div class="note">
+            <strong>Why this exists</strong>
+            <p>
+              The native App Intent writes this slot before JavaScript listeners
+              are active, making it useful for cold-start and app-resume routing.
+            </p>
+          </div>
+        </section>
+
+        <section id="clear-native-handoff" class="reference-section method">
+          <div class="method-header">
+            <span class="step">9</span>
+            <div>
+              <h2>clearPendingNativeAlarmHandoffAsync()</h2>
+              <p>Clear the durable native handoff slot after consuming it.</p>
+            </div>
+          </div>
+          <pre><code>await ExpoAlarm.clearPendingNativeAlarmHandoffAsync();</code></pre>
+          <h3>Returns</h3>
+          <p><code>Promise&lt;void&gt;</code></p>
+        </section>
+
+        <section id="pending-actions" class="reference-section method">
+          <div class="method-header">
+            <span class="step">10</span>
+            <div>
+              <h2>getPendingAlarmActionsAsync()</h2>
+              <p>Read the native AlarmKit action history.</p>
+            </div>
+          </div>
+          <pre><code>const actions = await ExpoAlarm.getPendingAlarmActionsAsync();
+
+const relevant = actions.filter((action) =>
+  action.action === 'nativeStop' ||
+  action.action === 'secondaryOpen'
+);</code></pre>
+          <h3>Returns</h3>
+          <pre><code>type AlarmAction = {
+  id: string;
+  alarmId: string;
+  action: 'nativeStop' | 'secondaryOpen' | 'snooze' | 'dismiss';
+  timestamp: number;
+  foregroundRequested?: boolean;
+  rescheduled?: boolean;
+  rescheduledAlarmId?: string;
+  retryScheduledFor?: number;
+  backupAlarmId?: string;
+  backupScheduledFor?: number;
+  backupDelaySeconds?: number;
+};</code></pre>
+        </section>
+
+        <section id="clear-actions" class="reference-section method">
+          <div class="method-header">
+            <span class="step">11</span>
+            <div>
+              <h2>clearPendingAlarmActionsAsync(ids?)</h2>
+              <p>Clear specific action records or the entire action history.</p>
+            </div>
+          </div>
+          <pre><code>await ExpoAlarm.clearPendingAlarmActionsAsync(
+  actions.map((action) =&gt; action.id)
+);
+
+await ExpoAlarm.clearPendingAlarmActionsAsync();</code></pre>
+          <h3>Returns</h3>
+          <p><code>Promise&lt;void&gt;</code></p>
+        </section>
+
+        <section id="backup" class="reference-section method">
+          <div class="method-header">
+            <span class="step">12</span>
+            <div>
+              <h2>scheduleNativeAlarmBackupAsync(alarmId, delaySeconds?)</h2>
+              <p>Schedule a deterministic iOS AlarmKit backup timer.</p>
+            </div>
+          </div>
+          <pre><code>const backup = await ExpoAlarm.scheduleNativeAlarmBackupAsync(
+  alarmId,
+  0.1
+);</code></pre>
+          <h3>Returns</h3>
+          <pre><code>type NativeAlarmBackupResult = {
+  alarmId: string;
+  backupAlarmId: string;
+  scheduled: boolean;
+  scheduledFor?: number;
+  delaySeconds: number;
+};</code></pre>
+          <p>
+            The backup id is deterministic for the primary alarm id. Calling this
+            repeatedly cancels and replaces the same backup timer.
+          </p>
+        </section>
+
+        <section id="cancel-backup" class="reference-section method">
+          <div class="method-header">
+            <span class="step">13</span>
+            <div>
+              <h2>cancelNativeAlarmBackupAsync(alarmId)</h2>
+              <p>Cancel the deterministic iOS backup timer for a logical alarm id.</p>
+            </div>
+          </div>
+          <pre><code>const removed = await ExpoAlarm.cancelNativeAlarmBackupAsync(alarmId);</code></pre>
+          <h3>Returns</h3>
+          <p><code>Promise&lt;boolean&gt;</code></p>
+        </section>
+
+        <section id="complete" class="reference-section method">
+          <div class="method-header">
+            <span class="step">14</span>
+            <div>
+              <h2>completeNativeAlarmAsync(alarmId)</h2>
+              <p>Mark a native alarm flow complete and clear retry state.</p>
+            </div>
+          </div>
+          <pre><code>await ExpoAlarm.completeNativeAlarmAsync(alarmId);
+await ExpoAlarm.cancelAlarmAsync(alarmId);</code></pre>
+          <h3>Returns</h3>
+          <p><code>Promise&lt;void&gt;</code></p>
+          <div class="note">
+            <strong>Cleanup behavior</strong>
+            <p>
+              This marks the id complete for <code>rescheduleImmediate</code>,
+              cancels deterministic backup alarms, removes legacy retry ids, and
+              clears action records for that alarm.
+            </p>
+          </div>
+        </section>
+
+        <section id="reset-completion" class="reference-section method">
+          <div class="method-header">
+            <span class="step">15</span>
+            <div>
+              <h2>resetNativeAlarmCompletionAsync(alarmId)</h2>
+              <p>Allow native retry scheduling again for a previously completed id.</p>
+            </div>
+          </div>
+          <pre><code>await ExpoAlarm.resetNativeAlarmCompletionAsync(alarmId);</code></pre>
+          <h3>Returns</h3>
+          <p><code>Promise&lt;void&gt;</code></p>
+          <p>
+            <code>clearBypassAsync(alarmId)</code> is an older alias for the same
+            completion-marker reset behavior.
+          </p>
+        </section>
+
+        <section id="debug-state" class="reference-section method">
+          <div class="method-header">
+            <span class="step">16</span>
+            <div>
+              <h2>getNativeAlarmDebugStateAsync(alarmId)</h2>
+              <p>Inspect AlarmKit presentation, handoff, and retry state.</p>
+            </div>
+          </div>
+          <pre><code>const debug = await ExpoAlarm.getNativeAlarmDebugStateAsync(alarmId);
+
+console.log(debug.intentDebugCounts);
+console.log(debug.pendingHandoff);
+console.log(debug.activeRetryAlarmIds);</code></pre>
+          <h3>Returns</h3>
+          <pre><code>type NativeAlarmDebugState = {
+  alarmId: string;
+  isComplete: boolean;
+  activeRetryAlarmIds: string[];
+  pendingActions: AlarmAction[];
+  pendingHandoff?: AlarmAction | null;
+  intentDebugCounts?: Record&lt;string, number&gt;;
+  currentContext: AlarmContext | null;
+  alertActionMode?: 'default' | 'openMissionOnly';
+  stopButtonIncluded?: boolean;
+  secondaryButtonIncluded?: boolean;
+  secondaryButtonBehavior?: 'openApp' | 'recordOnly' | 'none';
+  stopIntentBehavior?: 'recordOnly' | 'openApp' | 'rescheduleImmediate';
+  alertInitializer?: 'secondaryOnly' | 'legacyStopButton';
+  runtimeSupportsSecondaryOnlyAlert?: boolean;
+  sound?: 'default' | 'named';
+  soundName?: string;
+};</code></pre>
+        </section>
+
+        <section id="android-clock" class="reference-section method">
+          <div class="method-header">
+            <span class="step">17</span>
+            <div>
+              <h2>Android Clock Methods</h2>
+              <p>Use system Clock intents on Android where supported.</p>
+            </div>
+          </div>
+          <h3>setSystemAlarmAsync(alarm)</h3>
+          <pre><code>const opened = await ExpoAlarm.setSystemAlarmAsync({
+  hour: 7,
+  minute: 30,
+  title: 'Morning alarm',
+  weekdays: [1, 2, 3, 4, 5],
+  showUi: true
+});</code></pre>
+          <p>
+            Android sends <code>AlarmClock.ACTION_SET_ALARM</code>. iOS does not
+            expose a public API for creating alarms in the system Clock app.
+          </p>
+          <h3>openSystemAlarmAppAsync()</h3>
+          <pre><code>const opened = await ExpoAlarm.openSystemAlarmAppAsync();</code></pre>
+          <p>
+            Opens the Android system Clock alarm screen when a compatible activity
+            exists. iOS uses a best-effort Clock URL and may return false.
+          </p>
+        </section>
+
+        <section id="events" class="reference-section method">
+          <div class="method-header">
+            <span class="step">18</span>
+            <div>
+              <h2>Events</h2>
+              <p>Subscribe to foreground native alarm events.</p>
+            </div>
+          </div>
+          <pre><code>const triggeredSub = ExpoAlarm.addListener(
+  'onAlarmTriggered',
+  (alarm) =&gt; {
+    console.log(alarm);
+  }
+);
+
+const actionSub = ExpoAlarm.addListener(
+  'onAlarmAction',
+  (action) =&gt; {
+    console.log(action);
+  }
+);
+
+const stateSub = ExpoAlarm.addListener(
+  'onAlarmStateChange',
+  (event) =&gt; {
+    console.log(event);
+  }
+);
+
+triggeredSub.remove();
+actionSub.remove();
+stateSub.remove();</code></pre>
+          <div class="note">
+            <strong>Reconcile after launch</strong>
+            <p>
+              Foreground listeners are best effort. Apps should also reconcile
+              from the async getters after launch or resume.
+            </p>
+          </div>
+        </section>
+      </article>
+    </main>
+
+    <footer class="footer">
+      <span>API reference for react-native-alarm-scheduler.</span>
+      <a href="./index.html">Back to overview</a>
+    </footer>
+  </body>
+</html>
