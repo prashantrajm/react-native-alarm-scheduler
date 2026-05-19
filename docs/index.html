@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Documentation for react-native-alarm-scheduler, an Expo native module for Android AlarmManager and iOS AlarmKit alarms."
+    />
+    <title>react-native-alarm-scheduler</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="react-native-alarm-scheduler home">
+        <span class="brand-mark">EA</span>
+        <span>react-native-alarm-scheduler</span>
+      </a>
+      <nav class="nav" aria-label="Primary navigation">
+        <a href="#install">Install</a>
+        <a href="#usage">Usage</a>
+        <a href="#ios">iOS</a>
+        <a href="#api">API</a>
+        <a href="https://github.com/rajmaurya-dev/react-native-alarm-scheduler">GitHub</a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Expo native module</p>
+          <h1>User-visible alarms for React Native apps.</h1>
+          <p class="lede">
+            Schedule Android alarm-clock alarms and iOS AlarmKit alarms from a
+            small TypeScript API, with native handoff helpers for alarm action
+            routing and completion-gated flows.
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="#install">Get started</a>
+            <a class="button" href="https://www.npmjs.com/package/react-native-alarm-scheduler">npm package</a>
+          </div>
+        </div>
+        <div class="hero-panel" aria-label="Quick install command">
+          <div class="terminal-bar">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <pre><code>npx expo install react-native-alarm-scheduler</code></pre>
+          <div class="panel-grid">
+            <div>
+              <strong>Android</strong>
+              <span>AlarmManager.setAlarmClock</span>
+            </div>
+            <div>
+              <strong>iOS 26+</strong>
+              <span>AlarmKit scheduling</span>
+            </div>
+            <div>
+              <strong>Expo</strong>
+              <span>Config plugin included</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="capabilities" aria-label="Core capabilities">
+        <article>
+          <span class="kicker">Scheduling</span>
+          <h2>App-owned native alarms</h2>
+          <p>
+            Create, list, and cancel alarms with platform-specific native behavior
+            where public APIs support it.
+          </p>
+        </article>
+        <article>
+          <span class="kicker">Actions</span>
+          <h2>Native handoffs</h2>
+          <p>
+            Record AlarmKit stop and secondary actions so JavaScript can reconcile
+            app-launch routing after the app foregrounds.
+          </p>
+        </article>
+        <article>
+          <span class="kicker">Sounds</span>
+          <h2>Bundled iOS audio</h2>
+          <p>
+            Add custom files to the iOS app bundle and pass the exact filename to
+            AlarmKit with <code>ios.soundName</code>.
+          </p>
+        </article>
+      </section>
+
+      <section id="install" class="section">
+        <div class="section-heading">
+          <p class="eyebrow">Install</p>
+          <h2>Install and configure the plugin</h2>
+        </div>
+        <div class="code-card">
+          <pre><code>npx expo install react-native-alarm-scheduler</code></pre>
+        </div>
+        <div class="code-card">
+          <pre><code>{
+  "expo": {
+    "plugins": [
+      [
+        "react-native-alarm-scheduler",
+        {
+          "alarmKitUsageDescription": "Allow this app to schedule alarms.",
+          "addExactAlarmPermission": true,
+          "addNotificationPermission": true,
+          "iosAlarmSounds": ["./assets/audio/bollywood-alarm.mp3"]
+        }
+      ]
+    ]
+  }
+}</code></pre>
+        </div>
+      </section>
+
+      <section id="usage" class="section split">
+        <div class="section-heading">
+          <p class="eyebrow">Usage</p>
+          <h2>Schedule an alarm</h2>
+          <p>
+            The same entry point works across platforms. Android accepts any string
+            id. iOS AlarmKit requires UUID strings when you provide an id.
+          </p>
+        </div>
+        <div class="code-card">
+          <pre><code>import ExpoAlarm from 'react-native-alarm-scheduler';
+
+const permissions = await ExpoAlarm.requestPermissionsAsync();
+
+if (permissions.canScheduleExactAlarms) {
+  const alarm = await ExpoAlarm.scheduleAlarmAsync({
+    id: '00000000-0000-4000-8000-000000000001',
+    hour: 7,
+    minute: 30,
+    title: 'Morning alarm',
+    weekdays: [1, 2, 3, 4, 5],
+    ios: {
+      alertTitle: 'Morning alarm',
+      stopIntentBehavior: 'rescheduleImmediate',
+      secondaryButtonTitle: 'Open',
+      secondaryButtonBehavior: 'openApp',
+      metadata: {
+        route: 'alarm-detail'
+      }
+    }
+  });
+}</code></pre>
+        </div>
+      </section>
+
+      <section id="ios" class="section">
+        <div class="section-heading">
+          <p class="eyebrow">iOS AlarmKit</p>
+          <h2>AlarmKit handoff and backup helpers</h2>
+          <p>
+            On iOS 26+, the module can record AlarmKit App Intent handoffs before
+            JavaScript listeners are active. Use the async getters after launch or
+            resume to reconcile state.
+          </p>
+        </div>
+        <div class="docs-grid">
+          <article class="doc-card">
+            <h3>Durable handoff</h3>
+            <p>
+              <code>getPendingNativeAlarmHandoffAsync()</code> returns the latest
+              stop or secondary action written by the native intent.
+            </p>
+            <pre><code>const handoff =
+  await ExpoAlarm.getPendingNativeAlarmHandoffAsync();
+
+if (handoff?.action === 'nativeStop') {
+  await ExpoAlarm.clearPendingNativeAlarmHandoffAsync();
+  // Navigate using handoff.alarmId.
+}</code></pre>
+          </article>
+          <article class="doc-card">
+            <h3>Backup timers</h3>
+            <p>
+              <code>scheduleNativeAlarmBackupAsync()</code> schedules a
+              deterministic AlarmKit timer for the logical alarm id.
+            </p>
+            <pre><code>await ExpoAlarm.scheduleNativeAlarmBackupAsync(
+  alarmId,
+  0.1
+);
+
+await ExpoAlarm.completeNativeAlarmAsync(alarmId);
+await ExpoAlarm.cancelAlarmAsync(alarmId);</code></pre>
+          </article>
+          <article class="doc-card">
+            <h3>Custom audio</h3>
+            <p>
+              Add sound files through the config plugin and pass the bundled
+              filename to AlarmKit.
+            </p>
+            <pre><code>await ExpoAlarm.scheduleAlarmAsync({
+  hour: 7,
+  minute: 30,
+  ios: {
+    soundName: 'bollywood-alarm.mp3'
+  }
+});</code></pre>
+          </article>
+        </div>
+      </section>
+
+      <section id="api" class="section">
+        <div class="section-heading">
+          <p class="eyebrow">API</p>
+          <h2>Core methods</h2>
+        </div>
+        <div class="api-table">
+          <div><code>getPermissionsAsync()</code><span>Read native alarm capability and authorization state.</span></div>
+          <div><code>requestPermissionsAsync()</code><span>Request or open the native permission surface where possible.</span></div>
+          <div><code>scheduleAlarmAsync(alarm)</code><span>Schedule an app-owned native alarm.</span></div>
+          <div><code>cancelAlarmAsync(id)</code><span>Cancel a scheduled or active app-owned alarm.</span></div>
+          <div><code>getCurrentAlarmContextAsync()</code><span>Read the active AlarmKit context when available.</span></div>
+          <div><code>getPendingAlarmActionsAsync()</code><span>Read recorded native action history.</span></div>
+          <div><code>getPendingNativeAlarmHandoffAsync()</code><span>Read the latest durable iOS native handoff.</span></div>
+          <div><code>getNativeAlarmDebugStateAsync(id)</code><span>Inspect retry ids, handoff state, and AlarmKit presentation metadata.</span></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>MIT licensed.</span>
+      <a href="https://github.com/rajmaurya-dev/react-native-alarm-scheduler">View source</a>
+    </footer>
+  </body>
+</html>
