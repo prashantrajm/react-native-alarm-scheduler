@@ -18,6 +18,9 @@ const withExpoAlarm = (config, props = {}) => {
     'Allow this app to schedule alarms that can alert you at the selected time.';
   const addExactAlarmPermission = props.addExactAlarmPermission !== false;
   const addNotificationPermission = props.addNotificationPermission !== false;
+  // Opt-in: USE_EXACT_ALARM is granted without a user prompt, but Google Play only allows it for
+  // apps whose core function is an alarm clock or calendar.
+  const addUseExactAlarmPermission = props.addUseExactAlarmPermission === true;
   const iosAlarmSounds = normalizeIosAlarmSounds(props.iosAlarmSounds);
 
   config = withAndroidManifest(config, (modConfig) => {
@@ -27,6 +30,9 @@ const withExpoAlarm = (config, props = {}) => {
     }
     if (addNotificationPermission) {
       AndroidConfig.Permissions.addPermission(manifest, 'android.permission.POST_NOTIFICATIONS');
+    }
+    if (addUseExactAlarmPermission) {
+      AndroidConfig.Permissions.addPermission(manifest, 'android.permission.USE_EXACT_ALARM');
     }
     AndroidConfig.Permissions.addPermission(manifest, 'com.android.alarm.permission.SET_ALARM');
     return modConfig;

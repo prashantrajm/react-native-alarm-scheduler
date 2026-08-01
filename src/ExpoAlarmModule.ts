@@ -15,6 +15,7 @@ declare class ExpoAlarmModule extends NativeModule<ExpoAlarmModuleEvents> {
   getPermissionsAsync(): Promise<AlarmPermissionResponse>;
   requestPermissionsAsync(): Promise<AlarmPermissionResponse>;
   openAlarmSettingsAsync(): Promise<boolean>;
+  openFullScreenIntentSettingsAsync(): Promise<boolean>;
   scheduleAlarmAsync(alarm: AlarmScheduleInput): Promise<ScheduledAlarm>;
   cancelAlarmAsync(id: string): Promise<boolean>;
   getScheduledAlarmsAsync(): Promise<ScheduledAlarm[]>;

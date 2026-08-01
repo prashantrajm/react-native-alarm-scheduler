@@ -61,3 +61,7 @@ yarn-error.log
 .codex/
 skills-lock.json
 codex*.local.*
+
+# Local design notes (not published with the package)
+AUDIBILITY-PORT-PLAN.md
+KEEPING-THE-ALARM-AUDIBLE.md

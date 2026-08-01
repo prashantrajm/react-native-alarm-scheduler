@@ -122,12 +122,20 @@ type AlarmAuthorizationStatus =
   status: AlarmAuthorizationStatus;
   canScheduleExactAlarms: boolean;
   canOpenSettings: boolean;
+  canUseFullScreenIntent?: boolean;
+  canPostNotifications?: boolean;
 };</code></pre>
           <div class="note">
             <strong>Platform behavior</strong>
             <p>
               Android reports exact alarm capability. iOS returns authorized only
               when AlarmKit is available and the app has authorization.
+            </p>
+            <p>
+              <code>canUseFullScreenIntent</code> is the Android 14+ grant for
+              taking over a locked screen; without it the alarm still rings but
+              only as a heads-up notification. Both extra fields are
+              <code>true</code> on older Android versions and on iOS.
             </p>
           </div>
         </section>
@@ -165,9 +173,33 @@ type AlarmAuthorizationStatus =
           <p><code>Promise&lt;boolean&gt;</code></p>
         </section>
 
-        <section id="schedule" class="reference-section method">
+        <section id="fullscreen-settings" class="reference-section method">
           <div class="method-header">
             <span class="step">4</span>
+            <div>
+              <h2>openFullScreenIntentSettingsAsync()</h2>
+              <p>Open the Android 14+ full-screen notification settings screen.</p>
+            </div>
+          </div>
+          <pre><code>const permissions = await ExpoAlarm.getPermissionsAsync();
+
+if (permissions.canUseFullScreenIntent === false) {
+  await ExpoAlarm.openFullScreenIntentSettingsAsync();
+}</code></pre>
+          <h3>Returns</h3>
+          <p><code>Promise&lt;boolean&gt;</code></p>
+          <div class="note">
+            <strong>Platform behavior</strong>
+            <p>
+              Returns <code>false</code> on Android 13 and older, on iOS, on web,
+              and when no matching settings activity exists.
+            </p>
+          </div>
+        </section>
+
+        <section id="schedule" class="reference-section method">
+          <div class="method-header">
+            <span class="step">5</span>
             <div>
               <h2>scheduleAlarmAsync(alarm)</h2>
               <p>Schedule an app-owned native alarm.</p>
@@ -189,6 +221,10 @@ type AlarmAuthorizationStatus =
     metadata: {
       route: 'alarm-detail'
     }
+  },
+  android: {
+    launchUri: 'myapp://alarm-detail',
+    maxRingDurationSeconds: 0
   }
 });</code></pre>
           <h3>Input</h3>
@@ -201,6 +237,7 @@ type AlarmAuthorizationStatus =
   timestamp?: number;
   showUi?: boolean;
   ios?: IosAlarmOptions;
+  android?: AndroidAlarmOptions;
 };
 
 type IosAlarmOptions = {
@@ -213,7 +250,49 @@ type IosAlarmOptions = {
   stopIntentBehavior?: 'recordOnly' | 'openApp' | 'rescheduleImmediate';
   secondaryButtonBehavior?: 'openApp' | 'recordOnly' | 'none';
   soundName?: string;
+};
+
+type AndroidAlarmOptions = {
+  metadata?: AlarmMetadata;
+  alertTitle?: string;
+  alertBody?: string;
+  alertActionMode?: 'default' | 'openMissionOnly';
+  stopButtonTitle?: string;
+  secondaryButtonTitle?: string;
+  stopIntentBehavior?: 'recordOnly' | 'openApp' | 'rescheduleImmediate';
+  secondaryButtonBehavior?: 'openApp' | 'recordOnly' | 'none';
+  soundName?: string;
+  soundUri?: string;
+  vibrate?: boolean;
+  enforceVolume?: boolean;
+  restoreVolume?: boolean;
+  volume?: number;
+  fullScreen?: boolean;
+  fullScreenTarget?: 'native' | 'app';
+  launchUri?: string;
+  maxRingDurationSeconds?: number;
+  backupDelaySeconds?: number;
 };</code></pre>
+          <div class="note">
+            <strong>Android inherits the iOS options</strong>
+            <p>
+              Every <code>android</code> field that means the same thing as an
+              <code>ios</code> field falls back to it when omitted:
+              <code>metadata</code>, <code>alertTitle</code>,
+              <code>alertActionMode</code>, <code>stopButtonTitle</code>,
+              <code>secondaryButtonTitle</code>, <code>stopIntentBehavior</code>,
+              <code>secondaryButtonBehavior</code> and <code>soundName</code>. An
+              app written against the AlarmKit flow behaves the same on Android
+              without passing an <code>android</code> block at all.
+            </p>
+            <p>
+              <code>alertActionMode: 'openMissionOnly'</code> is absolute on
+              Android: the package owns the ringing screen, so there is no stop
+              button and the notification cannot be swiped away. The alarm rings
+              until <code>completeNativeAlarmAsync()</code> or
+              <code>maxRingDurationSeconds</code>.
+            </p>
+          </div>
           <h3>Returns</h3>
           <pre><code>type ScheduledAlarm = {
   id: string;
@@ -237,7 +316,7 @@ type IosAlarmOptions = {
 
         <section id="list" class="reference-section method">
           <div class="method-header">
-            <span class="step">5</span>
+            <span class="step">6</span>
             <div>
               <h2>getScheduledAlarmsAsync()</h2>
               <p>Return app-owned alarms stored by this module.</p>
@@ -250,7 +329,7 @@ type IosAlarmOptions = {
 
         <section id="cancel" class="reference-section method">
           <div class="method-header">
-            <span class="step">6</span>
+            <span class="step">7</span>
             <div>
               <h2>cancelAlarmAsync(id)</h2>
               <p>Cancel an app-owned alarm by id.</p>
@@ -271,10 +350,10 @@ type IosAlarmOptions = {
 
         <section id="current-context" class="reference-section method">
           <div class="method-header">
-            <span class="step">7</span>
+            <span class="step">8</span>
             <div>
               <h2>getCurrentAlarmContextAsync()</h2>
-              <p>Read the active AlarmKit context for launch or resume routing.</p>
+              <p>Read the active alarm context for launch or resume routing.</p>
             </div>
           </div>
           <pre><code>const context = await ExpoAlarm.getCurrentAlarmContextAsync();
@@ -294,14 +373,19 @@ if (context?.state === 'alerting' || context?.state === 'countdown') {
             <code>id</code> remains the original logical alarm id and
             <code>nativeAlarmId</code> contains the backup UUID.
           </p>
+          <p>
+            On Android this returns the currently ringing alarm, falling back to a
+            one-shot alarm that fired within the last hour and was never
+            completed. On web it returns <code>null</code>.
+          </p>
         </section>
 
         <section id="native-handoff" class="reference-section method">
           <div class="method-header">
-            <span class="step">8</span>
+            <span class="step">9</span>
             <div>
               <h2>getPendingNativeAlarmHandoffAsync()</h2>
-              <p>Read the latest durable iOS AlarmKit intent handoff.</p>
+              <p>Read the latest durable native alarm handoff.</p>
             </div>
           </div>
           <pre><code>const handoff = await ExpoAlarm.getPendingNativeAlarmHandoffAsync();
@@ -315,15 +399,18 @@ if (handoff?.action === 'nativeStop' || handoff?.action === 'secondaryOpen') {
           <div class="note">
             <strong>Why this exists</strong>
             <p>
-              The native App Intent writes this slot before JavaScript listeners
-              are active, making it useful for cold-start and app-resume routing.
+              Native code writes this slot before JavaScript listeners are
+              active, making it the right source for cold-start and app-resume
+              routing. On iOS the AlarmKit App Intent writes it when the user
+              presses a button; on Android it is written the moment the alarm
+              starts ringing.
             </p>
           </div>
         </section>
 
         <section id="clear-native-handoff" class="reference-section method">
           <div class="method-header">
-            <span class="step">9</span>
+            <span class="step">10</span>
             <div>
               <h2>clearPendingNativeAlarmHandoffAsync()</h2>
               <p>Clear the durable native handoff slot after consuming it.</p>
@@ -336,7 +423,7 @@ if (handoff?.action === 'nativeStop' || handoff?.action === 'secondaryOpen') {
 
         <section id="pending-actions" class="reference-section method">
           <div class="method-header">
-            <span class="step">10</span>
+            <span class="step">11</span>
             <div>
               <h2>getPendingAlarmActionsAsync()</h2>
               <p>Read the native AlarmKit action history.</p>
@@ -366,7 +453,7 @@ const relevant = actions.filter((action) =>
 
         <section id="clear-actions" class="reference-section method">
           <div class="method-header">
-            <span class="step">11</span>
+            <span class="step">12</span>
             <div>
               <h2>clearPendingAlarmActionsAsync(ids?)</h2>
               <p>Clear specific action records or the entire action history.</p>
@@ -383,10 +470,10 @@ await ExpoAlarm.clearPendingAlarmActionsAsync();</code></pre>
 
         <section id="backup" class="reference-section method">
           <div class="method-header">
-            <span class="step">12</span>
+            <span class="step">13</span>
             <div>
               <h2>scheduleNativeAlarmBackupAsync(alarmId, delaySeconds?)</h2>
-              <p>Schedule a deterministic iOS AlarmKit backup timer.</p>
+              <p>Schedule a deterministic native backup alarm.</p>
             </div>
           </div>
           <pre><code>const backup = await ExpoAlarm.scheduleNativeAlarmBackupAsync(
@@ -403,16 +490,17 @@ await ExpoAlarm.clearPendingAlarmActionsAsync();</code></pre>
 };</code></pre>
           <p>
             The backup id is deterministic for the primary alarm id. Calling this
-            repeatedly cancels and replaces the same backup timer.
+            repeatedly cancels and replaces the same backup timer. iOS uses an
+            AlarmKit timer; Android uses an exact <code>setAlarmClock</code>.
           </p>
         </section>
 
         <section id="cancel-backup" class="reference-section method">
           <div class="method-header">
-            <span class="step">13</span>
+            <span class="step">14</span>
             <div>
               <h2>cancelNativeAlarmBackupAsync(alarmId)</h2>
-              <p>Cancel the deterministic iOS backup timer for a logical alarm id.</p>
+              <p>Cancel the deterministic backup alarm for a logical alarm id.</p>
             </div>
           </div>
           <pre><code>const removed = await ExpoAlarm.cancelNativeAlarmBackupAsync(alarmId);</code></pre>
@@ -422,7 +510,7 @@ await ExpoAlarm.clearPendingAlarmActionsAsync();</code></pre>
 
         <section id="complete" class="reference-section method">
           <div class="method-header">
-            <span class="step">14</span>
+            <span class="step">15</span>
             <div>
               <h2>completeNativeAlarmAsync(alarmId)</h2>
               <p>Mark a native alarm flow complete and clear retry state.</p>
@@ -439,12 +527,18 @@ await ExpoAlarm.cancelAlarmAsync(alarmId);</code></pre>
               cancels deterministic backup alarms, removes legacy retry ids, and
               clears action records for that alarm.
             </p>
+            <p>
+              On Android this is also what silences the ringing service, so it is
+              mandatory rather than advisory: with
+              <code>alertActionMode: 'openMissionOnly'</code> the alarm keeps
+              playing until this call lands.
+            </p>
           </div>
         </section>
 
         <section id="reset-completion" class="reference-section method">
           <div class="method-header">
-            <span class="step">15</span>
+            <span class="step">16</span>
             <div>
               <h2>resetNativeAlarmCompletionAsync(alarmId)</h2>
               <p>Allow native retry scheduling again for a previously completed id.</p>
@@ -461,7 +555,7 @@ await ExpoAlarm.cancelAlarmAsync(alarmId);</code></pre>
 
         <section id="debug-state" class="reference-section method">
           <div class="method-header">
-            <span class="step">16</span>
+            <span class="step">17</span>
             <div>
               <h2>getNativeAlarmDebugStateAsync(alarmId)</h2>
               <p>Inspect AlarmKit presentation, handoff, and retry state.</p>
@@ -486,16 +580,30 @@ console.log(debug.activeRetryAlarmIds);</code></pre>
   secondaryButtonIncluded?: boolean;
   secondaryButtonBehavior?: 'openApp' | 'recordOnly' | 'none';
   stopIntentBehavior?: 'recordOnly' | 'openApp' | 'rescheduleImmediate';
-  alertInitializer?: 'secondaryOnly' | 'legacyStopButton';
+  alertInitializer?:
+    | 'secondaryOnly'
+    | 'legacyStopButton'
+    | 'androidRingService';
   runtimeSupportsSecondaryOnlyAlert?: boolean;
   sound?: 'default' | 'named';
   soundName?: string;
+  isRinging?: boolean;
+  isScheduled?: boolean;
+  canUseFullScreenIntent?: boolean;
+  canScheduleExactAlarms?: boolean;
 };</code></pre>
+          <p>
+            On Android <code>alertInitializer</code> is always
+            <code>androidRingService</code>, and <code>isRinging</code>,
+            <code>isScheduled</code>, <code>canUseFullScreenIntent</code> and
+            <code>canScheduleExactAlarms</code> describe the live state of the
+            ringing service and the grants it depends on.
+          </p>
         </section>
 
         <section id="android-clock" class="reference-section method">
           <div class="method-header">
-            <span class="step">17</span>
+            <span class="step">18</span>
             <div>
               <h2>Android Clock Methods</h2>
               <p>Use system Clock intents on Android where supported.</p>
@@ -523,7 +631,7 @@ console.log(debug.activeRetryAlarmIds);</code></pre>
 
         <section id="events" class="reference-section method">
           <div class="method-header">
-            <span class="step">18</span>
+            <span class="step">19</span>
             <div>
               <h2>Events</h2>
               <p>Subscribe to foreground native alarm events.</p>

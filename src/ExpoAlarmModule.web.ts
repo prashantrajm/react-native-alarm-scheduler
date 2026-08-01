@@ -24,6 +24,10 @@ class ExpoAlarmModule extends NativeModule<ExpoAlarmModuleEvents> {
     return false;
   }
 
+  async openFullScreenIntentSettingsAsync(): Promise<boolean> {
+    return false;
+  }
+
   async scheduleAlarmAsync(
     _alarm: AlarmScheduleInput,
   ): Promise<ScheduledAlarm> {
@@ -114,6 +118,8 @@ class ExpoAlarmModule extends NativeModule<ExpoAlarmModuleEvents> {
       status: "unavailable",
       canScheduleExactAlarms: false,
       canOpenSettings: false,
+      canUseFullScreenIntent: false,
+      canPostNotifications: false,
     };
   }
 }

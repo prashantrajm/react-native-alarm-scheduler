@@ -20,6 +20,7 @@
         <a href="#install">Install</a>
         <a href="#usage">Usage</a>
         <a href="#ios">iOS</a>
+        <a href="#android">Android</a>
         <a href="./api.html">API docs</a>
         <a href="https://github.com/rajmaurya-dev/react-native-alarm-scheduler">GitHub</a>
       </nav>
@@ -51,7 +52,7 @@
           <div class="panel-grid">
             <div>
               <strong>Android</strong>
-              <span>AlarmManager.setAlarmClock</span>
+              <span>Exact alarms + full-screen ring</span>
             </div>
             <div>
               <strong>iOS 26+</strong>
@@ -78,16 +79,18 @@
           <span class="kicker">Actions</span>
           <h2>Native handoffs</h2>
           <p>
-            Record AlarmKit stop and secondary actions so JavaScript can reconcile
-            app-launch routing after the app foregrounds.
+            Record native alarm actions on both platforms so JavaScript can
+            reconcile app-launch routing after the app foregrounds, even from a
+            cold start.
           </p>
         </article>
         <article>
           <span class="kicker">Sounds</span>
-          <h2>Bundled iOS audio</h2>
+          <h2>Custom alarm audio</h2>
           <p>
-            Add custom files to the iOS app bundle and pass the exact filename to
-            AlarmKit with <code>ios.soundName</code>.
+            Bundle files for AlarmKit with <code>ios.soundName</code>, or point
+            Android at a raw resource or content URI with
+            <code>android.soundName</code> and <code>android.soundUri</code>.
           </p>
         </article>
       </section>
@@ -110,6 +113,7 @@
           "alarmKitUsageDescription": "Allow this app to schedule alarms.",
           "addExactAlarmPermission": true,
           "addNotificationPermission": true,
+          "addUseExactAlarmPermission": false,
           "iosAlarmSounds": ["./assets/audio/bollywood-alarm.mp3"]
         }
       ]
@@ -148,6 +152,9 @@ if (permissions.canScheduleExactAlarms) {
       metadata: {
         route: 'alarm-detail'
       }
+    },
+    android: {
+      launchUri: 'myapp://alarm-detail'
     }
   });
 }</code></pre>
@@ -210,6 +217,69 @@ await ExpoAlarm.cancelAlarmAsync(alarmId);</code></pre>
         </div>
       </section>
 
+      <section id="android" class="section">
+        <div class="section-heading">
+          <p class="eyebrow">Android</p>
+          <h2>Alarms that keep ringing</h2>
+          <p>
+            A fired Android alarm starts a foreground service that loops the alarm
+            audio and shows a lock-screen ringing surface. Because the package owns
+            that surface outright, there is no system stop button to work around.
+          </p>
+        </div>
+        <div class="docs-grid">
+          <article class="doc-card">
+            <h3>Completion gating</h3>
+            <p>
+              With <code>openMissionOnly</code> the only way out is the button
+              that opens your app. The alarm rings until you say so.
+            </p>
+            <pre><code>await ExpoAlarm.scheduleAlarmAsync({
+  hour: 7,
+  minute: 0,
+  android: {
+    alertActionMode: 'openMissionOnly',
+    secondaryButtonTitle: 'Start mission',
+    maxRingDurationSeconds: 0
+  }
+});
+
+// Later, once the user has actually finished:
+await ExpoAlarm.completeNativeAlarmAsync(alarmId);</code></pre>
+          </article>
+          <article class="doc-card">
+            <h3>Audibility</h3>
+            <p>
+              Audio loops on the alarm stream, which ignores the ringer and Do Not
+              Disturb. The volume is pinned for the duration and re-raised
+              whenever anything lowers it.
+            </p>
+            <pre><code>android: {
+  enforceVolume: true,
+  restoreVolume: true,
+  volume: 1,
+  vibrate: true
+}</code></pre>
+          </article>
+          <article class="doc-card">
+            <h3>Required grants</h3>
+            <p>
+              Exact alarms are mandatory: without them the ringing service cannot
+              start. Android 14+ also gates full-screen UI separately.
+            </p>
+            <pre><code>const p = await ExpoAlarm.getPermissionsAsync();
+
+if (!p.canScheduleExactAlarms) {
+  await ExpoAlarm.requestPermissionsAsync();
+}
+
+if (p.canUseFullScreenIntent === false) {
+  await ExpoAlarm.openFullScreenIntentSettingsAsync();
+}</code></pre>
+          </article>
+        </div>
+      </section>
+
       <section id="api" class="section">
         <div class="section-heading">
           <p class="eyebrow">API</p>
@@ -224,9 +294,10 @@ await ExpoAlarm.cancelAlarmAsync(alarmId);</code></pre>
           <a href="./api.html#request-permissions"><code>requestPermissionsAsync()</code><span>Request or open the native permission surface where possible.</span></a>
           <a href="./api.html#schedule"><code>scheduleAlarmAsync(alarm)</code><span>Schedule an app-owned native alarm.</span></a>
           <a href="./api.html#cancel"><code>cancelAlarmAsync(id)</code><span>Cancel a scheduled or active app-owned alarm.</span></a>
-          <a href="./api.html#current-context"><code>getCurrentAlarmContextAsync()</code><span>Read the active AlarmKit context when available.</span></a>
+          <a href="./api.html#current-context"><code>getCurrentAlarmContextAsync()</code><span>Read the active alarm context when available.</span></a>
           <a href="./api.html#pending-actions"><code>getPendingAlarmActionsAsync()</code><span>Read recorded native action history.</span></a>
-          <a href="./api.html#native-handoff"><code>getPendingNativeAlarmHandoffAsync()</code><span>Read the latest durable iOS native handoff.</span></a>
+          <a href="./api.html#native-handoff"><code>getPendingNativeAlarmHandoffAsync()</code><span>Read the latest durable native handoff, on either platform.</span></a>
+          <a href="./api.html#complete"><code>completeNativeAlarmAsync(id)</code><span>End a completion-gated alarm and stop the Android ring.</span></a>
           <a href="./api.html#debug-state"><code>getNativeAlarmDebugStateAsync(id)</code><span>Inspect retry ids, handoff state, and AlarmKit presentation metadata.</span></a>
         </div>
       </section>

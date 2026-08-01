@@ -6,6 +6,11 @@ import android.content.Intent
 
 class ExpoAlarmReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent) {
-    ExpoAlarmScheduler.handleTriggered(context, intent)
+    if (intent.action != null && intent.action != ExpoAlarmScheduler.ACTION_TRIGGERED) {
+      return
+    }
+    // A throw here would crash the host app from a background broadcast. Whatever goes wrong,
+    // failing quietly beats taking the app down with the alarm.
+    runCatching { ExpoAlarmScheduler.handleTriggered(context, intent) }
   }
 }
