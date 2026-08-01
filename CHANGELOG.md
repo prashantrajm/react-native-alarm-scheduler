@@ -2,7 +2,30 @@
 
 ## 0.2.0
 
+No TypeScript API was removed or changed incompatibly, and iOS behavior is untouched. Android
+runtime behavior, however, changes substantially — read this section before upgrading an Android app.
+
 ### 🛠 Breaking changes
+
+- **Android alarms now keep ringing.** A fired alarm used to post one notification that played the
+  channel sound once and could be swiped away. It now starts a foreground service that loops the
+  alarm audio and shows a full-screen ringing screen until the user stops it, the alarm hits
+  `android.maxRingDurationSeconds` (default 300), or the app calls `completeNativeAlarmAsync()`.
+  Set `android: { fullScreen: false, maxRingDurationSeconds: 5 }` to approximate the old behavior.
+- **Android exact-alarm permission now matters more.** Without it the ringing service cannot start
+  at all, because Android only exempts exact alarms from the background foreground-service
+  restriction. The alarm degrades to a notification. Gate scheduling on `canScheduleExactAlarms`.
+- **The package's Android manifest now contributes permissions and components** to the host app:
+  `WAKE_LOCK`, `VIBRATE`, `RECEIVE_BOOT_COMPLETED`, `USE_FULL_SCREEN_INTENT`, `FOREGROUND_SERVICE`,
+  `FOREGROUND_SERVICE_SPECIAL_USE`, `DISABLE_KEYGUARD`, `TURN_SCREEN_ON`, plus a foreground service,
+  a ringing activity and a boot receiver. The `specialUse` foreground service type requires a
+  justification in Play Console.
+- **Android one-shot alarms stay in `getScheduledAlarmsAsync()` after firing**, until they are
+  completed or cancelled, so the completion flow can still resolve them. They used to disappear the
+  moment they fired. This matches existing iOS behavior.
+- **Android alarms now survive reboots.** Previously they were silently lost; an app that
+  rescheduled everything on launch to work around that will now schedule over an already-armed
+  alarm. This is harmless — ids are stable and re-arming replaces — but the workaround is redundant.
 
 ### 🎉 New features
 
