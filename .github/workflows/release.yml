@@ -1,0 +1,161 @@
+name: Release
+
+# Publishes to npm when a merge to main lands a version that is not on the registry yet.
+# The version in package.json is the only trigger: bump it in the PR, and merging ships it.
+#
+# Authentication is npm trusted publishing (OIDC) — there is no NPM_TOKEN. The identity comes
+# from `permissions: id-token: write` plus a trusted publisher registered on npmjs.com for this
+# repository and this workflow filename. Renaming this file breaks publishing until the trusted
+# publisher entry is updated to match.
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Run every check but skip the publish"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  # Decide whether this commit is publishable before spending time on the build.
+  eligibility:
+    runs-on: ubuntu-latest
+    outputs:
+      should_publish: ${{ steps.check.outputs.should_publish }}
+      version: ${{ steps.check.outputs.version }}
+      name: ${{ steps.check.outputs.name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compare package.json against the registry
+        id: check
+        run: |
+          set -euo pipefail
+          name=$(node -p "require('./package.json').name")
+          version=$(node -p "require('./package.json').version")
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+          # `npm view` exits non-zero for a package with no published versions at all.
+          published=$(npm view "$name" versions --json 2>/dev/null || echo '[]')
+
+          if node -e "process.exit(JSON.parse(process.argv[1]).includes(process.argv[2]) ? 0 : 1)" "$published" "$version"; then
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::$name@$version is already on npm. Nothing to publish."
+          else
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::$name@$version is not on npm. Proceeding to publish."
+          fi
+
+  publish:
+    needs: eligibility
+    if: needs.eligibility.outputs.should_publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the tag and the GitHub Release
+      id-token: write # mint the OIDC token npm trades for a publish credential
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/${{ needs.eligibility.outputs.name }}/v/${{ needs.eligibility.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      # Trusted publishing needs npm 11.5.1 or newer; the version bundled with Node is older.
+      - name: Use an npm that supports trusted publishing
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Verify the tarball contents
+        run: |
+          set -euo pipefail
+          npm pack --dry-run
+          # The published package is useless without the native source, and the file list is easy
+          # to break from package.json. Fail loudly rather than shipping a JS-only tarball.
+          #
+          # The `prepare` lifecycle writes to stdout ahead of the JSON, so slice from the first
+          # array bracket rather than parsing the whole stream.
+          files=$(npm pack --dry-run --json | node -e "
+            const raw = require('fs').readFileSync(0, 'utf8');
+            const start = raw.indexOf('[');
+            if (start === -1) { throw new Error('npm pack produced no JSON'); }
+            const entries = JSON.parse(raw.slice(start))[0].files.map((f) => f.path);
+            console.log(entries.join('\n'));
+          ")
+          for required in \
+            "android/src/main/AndroidManifest.xml" \
+            "android/src/main/java/expo/modules/alarm/ExpoAlarmModule.kt" \
+            "android/src/main/java/expo/modules/alarm/ExpoAlarmRingService.kt" \
+            "ios/ExpoAlarmModule.swift" \
+            "app.plugin.js" \
+            "build/index.js" \
+            "build/index.d.ts"
+          do
+            if ! grep -qxF "$required" <<< "$files"; then
+              echo "::error::$required is missing from the package tarball"
+              exit 1
+            fi
+          done
+
+      - name: Publish to npm
+        if: inputs.dry_run != true
+        run: npm publish --provenance --access public
+
+      - name: Extract the changelog section
+        id: notes
+        run: |
+          set -euo pipefail
+          version="${{ needs.eligibility.outputs.version }}"
+          # Everything between this version's heading and the next one.
+          awk -v v="## $version" '
+            $0 == v { capture = 1; next }
+            capture && /^## / { exit }
+            capture { print }
+          ' CHANGELOG.md > release-notes.md
+
+          if [ ! -s release-notes.md ]; then
+            echo "See CHANGELOG.md for details." > release-notes.md
+            echo "::warning::No CHANGELOG.md section found for $version."
+          fi
+
+      - name: Tag and create the GitHub Release
+        if: inputs.dry_run != true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="${{ needs.eligibility.outputs.version }}"
+          gh release create "v$version" \
+            --title "v$version" \
+            --notes-file release-notes.md \
+            --target "${{ github.sha }}" \
+            --verify-tag=false
