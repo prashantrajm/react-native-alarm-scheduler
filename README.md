@@ -31,6 +31,7 @@ ringing through Doze and a killed app, and iOS AlarmKit on iOS 26+. It also supp
 - **[API reference](https://react-native-alarm-scheduler.vercel.app/api)** — every method, type, and event.
 - **[Platform behavior](https://react-native-alarm-scheduler.vercel.app/platforms/android)** — Android ringing internals and iOS AlarmKit limits.
 - **[Example app](https://github.com/rajmauryafr/react-native-alarm-scheduler/tree/main/example)** — a runnable Expo app exercising the full API.
+- **[For AI agents](https://react-native-alarm-scheduler.vercel.app/ai)** — [`llms.txt`](https://react-native-alarm-scheduler.vercel.app/llms.txt), raw markdown per page, and a bundled agent skill.
 
 ## Requirements
 

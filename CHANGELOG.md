@@ -14,6 +14,15 @@ Documentation only. No runtime, API or native behavior changes.
 - Add the MIT `LICENSE` file that `package.json` already declared. It is now included in the
   published tarball.
 
+### 🤖 For AI agents
+
+- Ship an agent skill at `skills/react-native-alarm-scheduler/SKILL.md`, included in the published
+  tarball. It covers the constraints that are not visible from a type signature: exact-alarm gating,
+  why routing must not live in an event listener, UUID ids on iOS, Android inheriting the `ios`
+  options, and how far the undismissable-alarm guarantee actually extends per platform.
+- Serve `/llms.txt` and `/llms-full.txt` from the docs site, and raw markdown for any page by
+  appending `.md` to its URL.
+
 ## 0.2.0
 
 No TypeScript API was removed or changed incompatibly, and iOS behavior is untouched. Android

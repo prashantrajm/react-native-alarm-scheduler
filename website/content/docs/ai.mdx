@@ -1,0 +1,60 @@
+---
+title: AI and LLMs
+description: Machine-readable documentation and an agent skill for building with this package.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+This package has real behavioral constraints that are easy to get wrong from an API signature alone —
+Android's exact-alarm grant gating the ringing service, iOS AlarmKit's undismissable-alarm limits, and
+the fact that events are unreliable by design. These resources exist so a coding agent gets those
+rules instead of guessing.
+
+## llms.txt
+
+A short index of every page, following [llmstxt.org](https://llmstxt.org):
+
+```
+https://react-native-alarm-scheduler.vercel.app/llms.txt
+```
+
+Point an agent at it when you want it to pull only the pages it needs.
+
+## Full documentation as one file
+
+Every page concatenated as plain text, for pasting into a model's context in one step:
+
+```
+https://react-native-alarm-scheduler.vercel.app/llms-full.txt
+```
+
+## Raw markdown per page
+
+Any page is available as markdown by appending `.md` to its URL — MDX components stripped, prose and
+code kept:
+
+```
+https://react-native-alarm-scheduler.vercel.app/guides/completion-gating.md
+https://react-native-alarm-scheduler.vercel.app/api/scheduling.md
+https://react-native-alarm-scheduler.vercel.app/index.md
+```
+
+## Agent skill
+
+The package ships a skill covering the non-obvious rules — permission gating, why event listeners are
+the wrong place for routing, UUID ids on iOS, Android inheriting the iOS options, and a debugging
+table for "the alarm didn't ring".
+
+It is included in the npm tarball, so after installing the package:
+
+```sh
+mkdir -p .claude/skills
+cp -R node_modules/react-native-alarm-scheduler/skills/react-native-alarm-scheduler .claude/skills/
+```
+
+Or read it [on GitHub](https://github.com/rajmauryafr/react-native-alarm-scheduler/blob/main/skills/react-native-alarm-scheduler/SKILL.md).
+
+<Callout>
+The skill is written for agents that discover skills from a project directory. Any assistant that can
+read a markdown file can use it — the content is plain instructions, not a proprietary format.
+</Callout>
