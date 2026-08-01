@@ -135,6 +135,12 @@ export default function App() {
         secondaryButtonTitle: 'Open',
         secondaryButtonBehavior: 'openApp',
       },
+      // Shared fields (metadata, alertActionMode, stopIntentBehavior, button titles) are inherited
+      // from the `ios` block above; only Android-specific behavior is set here.
+      android: {
+        alertBody: 'Open the app and complete to stop this alarm',
+        maxRingDurationSeconds: 120,
+      },
     });
 
     setAlarmId(scheduled.id);

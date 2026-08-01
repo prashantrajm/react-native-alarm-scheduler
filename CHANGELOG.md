@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased
+
+### 🛠 Breaking changes
+
+### 🎉 New features
+
+- Bring Android to feature parity with the iOS AlarmKit flow. Alarms now ring through a foreground
+  service with a full-screen lock-screen UI, looping alarm-stream audio, volume pinning, and
+  completion gating — the Android module no longer stubs the handoff, action, context, completion or
+  backup APIs.
+- Add `android` options to `scheduleAlarmAsync()` covering metadata, presentation, sound, vibration,
+  volume enforcement, full-screen behavior, deep-link hand-off, ring duration and backup delay. Every
+  field that means the same thing on both platforms falls back to the matching `ios` option, so
+  existing AlarmKit-shaped call sites behave identically on Android with no changes.
+- Restore Android alarms across reboots, app updates, and time/timezone changes.
+- Add `openFullScreenIntentSettingsAsync()` plus `canUseFullScreenIntent` and `canPostNotifications`
+  on `AlarmPermissionResponse` for the Android 14+ full-screen intent grant.
+- Add an `addUseExactAlarmPermission` config plugin option.
+
+### 🐛 Bug fixes
+
+- Android alarms no longer stop at a single, swipe-away notification sound.
+- Android `onAlarmTriggered`, `onAlarmAction` and `onAlarmStateChange` are now actually emitted.
+- Fall back to `setAndAllowWhileIdle()` when exact alarms are revoked instead of failing to schedule.
+
+### 💡 Others
+
+- Move the Android alarm store under an `alarm:` preference key prefix, migrating existing records.
+
 ## 0.1.7
 
 ### 🛠 Breaking changes
