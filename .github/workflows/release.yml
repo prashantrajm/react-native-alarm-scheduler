@@ -98,19 +98,18 @@ jobs:
       - name: Verify the tarball contents
         run: |
           set -euo pipefail
-          npm pack --dry-run
           # The published package is useless without the native source, and the file list is easy
           # to break from package.json. Fail loudly rather than shipping a JS-only tarball.
           #
-          # The `prepare` lifecycle writes to stdout ahead of the JSON, so slice from the first
-          # array bracket rather than parsing the whole stream.
-          files=$(npm pack --dry-run --json | node -e "
-            const raw = require('fs').readFileSync(0, 'utf8');
-            const start = raw.indexOf('[');
-            if (start === -1) { throw new Error('npm pack produced no JSON'); }
-            const entries = JSON.parse(raw.slice(start))[0].files.map((f) => f.path);
-            console.log(entries.join('\n'));
-          ")
+          # Read a real tarball rather than `npm pack --json`: npm interleaves warnings and
+          # lifecycle output with the JSON on stdout, both before and after it, so the stream
+          # cannot be parsed as JSON at all.
+          rm -f ./*.tgz
+          npm pack --pack-destination .
+          tarball=$(ls -1 ./*.tgz | head -n 1)
+          echo "Inspecting $tarball"
+          files=$(tar -tzf "$tarball" | sed 's#^package/##')
+          echo "$files"
           for required in \
             "android/src/main/AndroidManifest.xml" \
             "android/src/main/java/expo/modules/alarm/ExpoAlarmModule.kt" \
@@ -125,6 +124,7 @@ jobs:
               exit 1
             fi
           done
+          rm -f ./*.tgz
 
       - name: Publish to npm
         if: inputs.dry_run != true
