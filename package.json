@@ -37,14 +37,14 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rajmaurya-dev/react-native-alarm-scheduler.git"
+    "url": "git+https://github.com/rajmauryafr/react-native-alarm-scheduler.git"
   },
   "bugs": {
-    "url": "https://github.com/rajmaurya-dev/react-native-alarm-scheduler/issues"
+    "url": "https://github.com/rajmauryafr/react-native-alarm-scheduler/issues"
   },
-  "author": "Raj Maurya <63300537+rajmaurya-dev@users.noreply.github.com> (https://github.com/rajmaurya-dev)",
+  "author": "Raj Maurya <63300537+rajmaurya-dev@users.noreply.github.com> (https://github.com/rajmauryafr)",
   "license": "MIT",
-  "homepage": "https://github.com/rajmaurya-dev/react-native-alarm-scheduler#readme",
+  "homepage": "https://github.com/rajmauryafr/react-native-alarm-scheduler#readme",
   "dependencies": {},
   "devDependencies": {
     "@types/react": "~19.1.1",

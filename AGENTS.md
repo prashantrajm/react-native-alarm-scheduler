@@ -47,5 +47,5 @@ xcodebuild -quiet -workspace example/ios/mymoduleexample.xcworkspace -scheme mym
 
 ## Release Notes
 
-- Package metadata must point to `https://github.com/rajmaurya-dev/react-native-alarm-scheduler`.
+- Package metadata must point to `https://github.com/rajmauryafr/react-native-alarm-scheduler`.
 - After publishing a new version, verify with `npm view react-native-alarm-scheduler version`.
