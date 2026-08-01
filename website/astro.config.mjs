@@ -20,6 +20,7 @@ const remarkPlugins = [
 const rehypePlugins = [rehypeCode];
 
 export default defineConfig({
+  site: 'https://react-native-alarm-scheduler.vercel.app',
   markdown: {
     processor: unified({
       syntaxHighlight: false,

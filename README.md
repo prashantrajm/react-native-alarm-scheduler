@@ -26,10 +26,10 @@ ringing through Doze and a killed app, and iOS AlarmKit on iOS 26+. It also supp
 
 ## Documentation
 
-📖 **[Documentation](https://rajmauryafr.github.io/react-native-alarm-scheduler/)** — guides for scheduling, handoffs, and sounds.
+📖 **[Documentation](https://react-native-alarm-scheduler.vercel.app)** — guides for scheduling, handoffs, and sounds.
 
-- **[API reference](https://rajmauryafr.github.io/react-native-alarm-scheduler/api.html)** — every method, type, and event.
-- **[Platform notes](https://github.com/rajmauryafr/react-native-alarm-scheduler/blob/main/docs/platform-notes.md)** — config plugin options, Android ringing internals, iOS AlarmKit limits.
+- **[API reference](https://react-native-alarm-scheduler.vercel.app/api)** — every method, type, and event.
+- **[Platform behavior](https://react-native-alarm-scheduler.vercel.app/platforms/android)** — Android ringing internals and iOS AlarmKit limits.
 - **[Example app](https://github.com/rajmauryafr/react-native-alarm-scheduler/tree/main/example)** — a runnable Expo app exercising the full API.
 
 ## Requirements
@@ -66,7 +66,7 @@ npx expo prebuild
 npx expo run:android
 ```
 
-All plugin options are listed in the [platform notes](https://github.com/rajmauryafr/react-native-alarm-scheduler/blob/main/docs/platform-notes.md#config-plugin-options).
+All plugin options are listed in the [installation docs](https://react-native-alarm-scheduler.vercel.app/installation#plugin-options).
 
 ## Usage
 
@@ -131,7 +131,7 @@ await ExpoAlarm.cancelAlarmAsync(alarmId); // then reschedule if the alarm repea
 
 Events (`onAlarmTriggered`, `onAlarmAction`, `onAlarmStateChange`) fire only when a JS runtime is
 alive. Everything they carry is also persisted natively, so reconcile from the async getters on every
-launch and foreground. See the [API reference](https://rajmauryafr.github.io/react-native-alarm-scheduler/api.html).
+launch and foreground. See the [API reference](https://react-native-alarm-scheduler.vercel.app/api/events).
 
 ## Platform support
 
