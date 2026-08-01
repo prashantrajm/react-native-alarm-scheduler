@@ -31,16 +31,21 @@ own lockfile and is excluded from the published package.
 - Content: `website/content/docs/**/*.mdx`, ordered by `meta.json` in each folder.
 - Sidebar/nav: `website/src/components/docs.tsx`.
 - Build: `cd website && npm install && npm run build` (output in `website/dist`).
-Vercel settings this build depends on:
+The Vercel project's **Root Directory** must be `website`, not the repo root.
 
-- **Root Directory** must be `website`, not the repo root.
-- **"Include source files outside of the Root Directory in the Build Step" must be OFF.** With it on,
-  Vite walks up from `website/` and parses the repo-root `tsconfig.json`, which extends
-  `expo-module-scripts/tsconfig.base`. Vercel only installs `website/`'s dependencies, so that
-  package is absent and `astro sync` fails with `Tsconfig not found expo-module-scripts/tsconfig.base`.
-  Nothing in `website/` references the parent directory, so excluding it is safe.
+`website/scripts/ensure-parent-tsconfig.mjs` runs as a `prebuild`/`predev` hook and must stay wired
+up. Vite walks up from `website/` and parses the repo-root `tsconfig.json`, which extends
+`expo-module-scripts/tsconfig.base` — a devDependency of the npm package, not of the site. Any build
+that installs only `website/`'s dependencies cannot resolve it, and `astro sync` fails with
+`Tsconfig not found expo-module-scripts/tsconfig.base`. The script drops a minimal stand-in when the
+real package is absent, and does nothing in a normal checkout.
 
-To reproduce that failure locally: `mv node_modules/expo-module-scripts /tmp && cd website && npm run build`.
+Reproduce the failure locally with:
+
+```sh
+mv node_modules/expo-module-scripts /tmp/ems && cd website && npm run build
+# restore afterwards: mv /tmp/ems ../node_modules/expo-module-scripts
+```
 
 Do not use `<Tabs>` or the `package-install` / `remarkCodeTab` code fences in MDX. Astro renders MDX
 content server-side and passes it into the `<Docs>` React island as slot children, so React context

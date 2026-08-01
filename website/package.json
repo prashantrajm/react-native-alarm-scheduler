@@ -8,6 +8,8 @@
   },
   "scripts": {
     "dev": "astro dev",
+    "prebuild": "node scripts/ensure-parent-tsconfig.mjs",
+    "predev": "node scripts/ensure-parent-tsconfig.mjs",
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro"
