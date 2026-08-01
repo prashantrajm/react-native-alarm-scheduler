@@ -1,10 +1,12 @@
 {
   "name": "react-native-alarm-scheduler",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Native alarm scheduling for React Native and Expo apps",
   "main": "build/index.js",
   "types": "build/index.d.ts",
   "files": [
+    "CHANGELOG.md",
+    "README.md",
     "android/build.gradle",
     "android/src",
     "app.plugin.js",
@@ -12,9 +14,8 @@
     "expo-module.config.json",
     "ios/ExpoAlarm.podspec",
     "ios/ExpoAlarmModule.swift",
-    "src",
-    "CHANGELOG.md",
-    "README.md"
+    "skills",
+    "src"
   ],
   "scripts": {
     "build": "expo-module build",

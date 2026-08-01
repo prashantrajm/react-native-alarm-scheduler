@@ -31,6 +31,10 @@ own lockfile and is excluded from the published package.
 - Content: `website/content/docs/**/*.mdx`, ordered by `meta.json` in each folder.
 - Sidebar/nav: `website/src/components/docs.tsx`.
 - Build: `cd website && npm install && npm run build` (output in `website/dist`).
+- LLM endpoints: `/llms.txt`, `/llms-full.txt` and per-page `.md` are generated from the same content
+  by `website/src/lib/llms.ts` — no separate copies to keep in sync.
+- Agent skill: `skills/react-native-alarm-scheduler/SKILL.md`, shipped in the npm tarball via the
+  `files` array. Update it when native constraints change; it is the guidance agents act on.
 The Vercel project's **Root Directory** must be `website`, not the repo root.
 
 `website/scripts/ensure-parent-tsconfig.mjs` runs as a `prebuild`/`predev` hook and must stay wired
