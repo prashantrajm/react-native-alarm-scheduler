@@ -24,6 +24,12 @@
 - Android alarms no longer stop at a single, swipe-away notification sound.
 - Android `onAlarmTriggered`, `onAlarmAction` and `onAlarmStateChange` are now actually emitted.
 - Fall back to `setAndAllowWhileIdle()` when exact alarms are revoked instead of failing to schedule.
+- Never let a failed foreground-service start crash the host app. When Android refuses the start —
+  revoked exact alarms, an OEM restriction, a restricted standby bucket — the alarm now falls back
+  to a full-screen-intent notification that rings through its own channel instead of throwing out of
+  the broadcast receiver.
+- Record the native handoff and emit `onAlarmTriggered` from the receiver, before the ringing service
+  is started, so app routing survives any failure in the presentation layer.
 
 ### 💡 Others
 

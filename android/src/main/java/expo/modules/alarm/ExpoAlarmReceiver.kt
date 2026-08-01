@@ -9,6 +9,8 @@ class ExpoAlarmReceiver : BroadcastReceiver() {
     if (intent.action != null && intent.action != ExpoAlarmScheduler.ACTION_TRIGGERED) {
       return
     }
-    ExpoAlarmScheduler.handleTriggered(context, intent)
+    // A throw here would crash the host app from a background broadcast. Whatever goes wrong,
+    // failing quietly beats taking the app down with the alarm.
+    runCatching { ExpoAlarmScheduler.handleTriggered(context, intent) }
   }
 }

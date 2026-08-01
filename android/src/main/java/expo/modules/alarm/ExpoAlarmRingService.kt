@@ -104,18 +104,8 @@ class ExpoAlarmRingService : Service() {
     scheduleTimeout(id, resolved)
     presentFullScreen(id, resolved, intent.getBooleanExtra(EXTRA_IS_BACKUP, false))
 
-    // Persisted first, then emitted: a cold-launched app replays this through
-    // getPendingNativeAlarmHandoffAsync(), a warm app gets the live event.
-    ExpoAlarmStore.recordHandoff(
-      context = this,
-      alarmId = id,
-      action = "secondaryOpen",
-      details = mapOf(
-        "foregroundRequested" to true,
-        "trigger" to true
-      )
-    )
-    ExpoAlarmEventBus.emitTriggered(ExpoAlarmScheduler.serialize(stored))
+    // The handoff record and onAlarmTriggered are emitted by the receiver before this service is
+    // even asked to start, so they survive the service being refused.
     ExpoAlarmEventBus.emitStateChange(id, "alerting", stored.optJSONObject("metadata"))
   }
 
@@ -382,110 +372,16 @@ class ExpoAlarmRingService : Service() {
   // region presentation
 
   private fun startForegroundNotification(id: String, options: ExpoAlarmOptions) {
-    createChannel()
-    val notification = buildNotification(id, options)
+    val notification = ExpoAlarmNotifications.buildRingNotification(this, id, options)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-      startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-    } else {
-      startForeground(NOTIFICATION_ID, notification)
-    }
-  }
-
-  private fun createChannel() {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-      return
-    }
-    val manager = getSystemService(NotificationManager::class.java) ?: return
-    // Sound is owned by the service's MediaPlayer, so the channel itself stays silent to avoid
-    // a second, unstoppable audio stream.
-    val channel = NotificationChannel(CHANNEL_ID, "Alarms", NotificationManager.IMPORTANCE_HIGH).apply {
-      setSound(null, null)
-      enableVibration(false)
-      setBypassDnd(true)
-      lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-      setShowBadge(false)
-    }
-    manager.createNotificationChannel(channel)
-  }
-
-  private fun buildNotification(id: String, options: ExpoAlarmOptions): Notification {
-    val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-      Notification.Builder(this, CHANNEL_ID)
-    } else {
-      @Suppress("DEPRECATION")
-      Notification.Builder(this).setPriority(Notification.PRIORITY_MAX)
-    }
-
-    val contentIntent = fullScreenPendingIntent(id, options)
-    builder
-      .setSmallIcon(applicationInfo.icon)
-      .setContentTitle(options.alertTitle)
-      .setContentText(options.alertBody)
-      .setCategory(Notification.CATEGORY_ALARM)
-      .setVisibility(Notification.VISIBILITY_PUBLIC)
-      .setOngoing(true)
-      .setAutoCancel(false)
-      .setContentIntent(contentIntent)
-
-    if (options.fullScreen) {
-      builder.setFullScreenIntent(contentIntent, true)
-    }
-
-    builder.addAction(
-      buildAction(
-        options.secondaryButtonTitle,
-        servicePendingIntent(ACTION_OPEN, id, "open")
+      startForeground(
+        ExpoAlarmNotifications.RING_NOTIFICATION_ID,
+        notification,
+        ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
       )
-    )
-    if (options.alertActionMode != ALERT_ACTION_MODE_OPEN_MISSION_ONLY) {
-      builder.addAction(
-        buildAction(
-          options.stopButtonTitle,
-          servicePendingIntent(ACTION_STOP, id, "stop")
-        )
-      )
-    }
-
-    return builder.build()
-  }
-
-  private fun buildAction(title: String, intent: PendingIntent): Notification.Action {
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-      Notification.Action.Builder(null as android.graphics.drawable.Icon?, title, intent).build()
     } else {
-      @Suppress("DEPRECATION")
-      Notification.Action.Builder(0, title, intent).build()
+      startForeground(ExpoAlarmNotifications.RING_NOTIFICATION_ID, notification)
     }
-  }
-
-  private fun servicePendingIntent(action: String, id: String, suffix: String): PendingIntent {
-    val intent = Intent(this, ExpoAlarmRingService::class.java).apply {
-      this.action = action
-      putExtra(EXTRA_ALARM_ID, id)
-    }
-    return PendingIntent.getService(
-      this,
-      ExpoAlarmScheduler.requestCode("$suffix-$id"),
-      intent,
-      ExpoAlarmScheduler.pendingFlags()
-    )
-  }
-
-  private fun fullScreenPendingIntent(id: String, options: ExpoAlarmOptions): PendingIntent {
-    if (options.fullScreenTarget == FULL_SCREEN_TARGET_APP) {
-      return PendingIntent.getActivity(
-        this,
-        ExpoAlarmScheduler.requestCode("app-$id"),
-        appIntent(id, options) ?: Intent(),
-        ExpoAlarmScheduler.pendingFlags()
-      )
-    }
-    return PendingIntent.getActivity(
-      this,
-      ExpoAlarmScheduler.requestCode("ring-$id"),
-      ExpoAlarmRingActivity.intent(this, id),
-      ExpoAlarmScheduler.pendingFlags()
-    )
   }
 
   /**
@@ -497,7 +393,7 @@ class ExpoAlarmRingService : Service() {
       return
     }
     val intent = if (options.fullScreenTarget == FULL_SCREEN_TARGET_APP) {
-      appIntent(id, options)
+      ExpoAlarmNotifications.appIntent(this, id, options)
     } else {
       ExpoAlarmRingActivity.intent(this, id).putExtra(EXTRA_IS_BACKUP, isBackup)
     }
@@ -508,24 +404,8 @@ class ExpoAlarmRingService : Service() {
   }
 
   private fun openApp(id: String, options: ExpoAlarmOptions) {
-    val intent = appIntent(id, options) ?: return
+    val intent = ExpoAlarmNotifications.appIntent(this, id, options) ?: return
     runCatching { startActivity(intent) }
-  }
-
-  private fun appIntent(id: String, options: ExpoAlarmOptions): Intent? {
-    val intent = ExpoAlarmScheduler.launchIntent(this) ?: return null
-    options.launchUri?.let { template ->
-      val uri = if (template.contains(ALARM_ID_PLACEHOLDER)) {
-        template.replace(ALARM_ID_PLACEHOLDER, Uri.encode(id))
-      } else {
-        val separator = if (template.contains("?")) "&" else "?"
-        "$template${separator}alarmId=${Uri.encode(id)}"
-      }
-      intent.data = runCatching { Uri.parse(uri) }.getOrNull()
-    }
-    return intent
-      .putExtra(EXTRA_ALARM_ID, id)
-      .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
   }
 
   // endregion
@@ -538,29 +418,34 @@ class ExpoAlarmRingService : Service() {
     const val EXTRA_ALARM_ID = "expo.modules.alarm.extra.ALARM_ID"
     const val EXTRA_IS_BACKUP = "expo.modules.alarm.extra.RING_IS_BACKUP"
 
-    private const val CHANNEL_ID = "expo_alarm_ring"
-    private const val NOTIFICATION_ID = 0xA1A2
     private const val WAKE_LOCK_TAG = "ExpoAlarm:ring"
     private const val DEFAULT_WAKE_LOCK_TIMEOUT_MILLIS = 10 * 60 * 1000L
     private const val TIMEOUT_BACKUP_DELAY_SECONDS = 60.0
-    private const val ALARM_ID_PLACEHOLDER = "{alarmId}"
 
     @Volatile
     private var activeAlarmId: String? = null
 
     fun activeAlarmId(): String? = activeAlarmId
 
-    fun start(context: Context, alarmId: String, isBackup: Boolean) {
+    /**
+     * Returns false when the platform refused to start the service — a revoked exact-alarm grant,
+     * an OEM restriction, or any other background-start denial. Callers must fall back rather than
+     * propagate: an exception here would otherwise kill the broadcast receiver and the alarm with
+     * it, which is the one outcome an alarm library may never produce.
+     */
+    fun start(context: Context, alarmId: String, isBackup: Boolean): Boolean {
       val intent = Intent(context, ExpoAlarmRingService::class.java).apply {
         action = ACTION_START
         putExtra(EXTRA_ALARM_ID, alarmId)
         putExtra(EXTRA_IS_BACKUP, isBackup)
       }
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        context.startForegroundService(intent)
-      } else {
-        context.startService(intent)
-      }
+      return runCatching {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+          context.startForegroundService(intent)
+        } else {
+          context.startService(intent)
+        }
+      }.isSuccess
     }
 
     fun complete(context: Context, alarmId: String) {

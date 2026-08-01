@@ -541,7 +541,7 @@ reconcile from `getPendingNativeAlarmHandoffAsync()`, `getPendingAlarmActionsAsy
 
 Android exact alarm behavior depends on OS version, target SDK, user settings, and Play policy. The module checks `canScheduleExactAlarms()` before reporting alarm capability and uses `setAlarmClock()` for user-visible alarm semantics.
 
-If exact alarms are denied, call `requestPermissionsAsync()` or `openAlarmSettingsAsync()` and ask the user to enable Alarms & reminders for your app. If exact alarms are revoked while alarms are already scheduled, the package falls back to `setAndAllowWhileIdle()` so alarms degrade in accuracy instead of vanishing.
+If exact alarms are denied, call `requestPermissionsAsync()` or `openAlarmSettingsAsync()` and ask the user to enable Alarms & reminders for your app. **Treat this as required, not optional.** Without it the package falls back to `setAndAllowWhileIdle()`, which loses more than timing accuracy: Android only exempts *exact* alarms from the background foreground-service restriction, so the ringing service cannot start either. The package then degrades again to a full-screen-intent notification that rings through its own channel — audible, but no wake lock and no guaranteed screen takeover.
 
 ### What happens when an alarm fires
 

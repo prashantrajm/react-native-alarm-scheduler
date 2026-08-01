@@ -103,7 +103,43 @@ internal object ExpoAlarmScheduler {
       rescheduleRepeatIfNeeded(context, stored)
     }
 
-    ExpoAlarmRingService.start(context, id, isBackup)
+    val options = ExpoAlarmOptions.fromJson(
+      stored.optJSONObject("options"),
+      stored.optString("title", "Alarm"),
+      id
+    )
+
+    // Persisted before anything that can fail, so however badly the presentation degrades, a
+    // launched app can still find out which alarm fired and route to its own UI.
+    ExpoAlarmStore.recordHandoff(
+      context = context,
+      alarmId = id,
+      action = "secondaryOpen",
+      details = mapOf("foregroundRequested" to true, "trigger" to true)
+    )
+    ExpoAlarmEventBus.emitTriggered(serialize(stored))
+    ExpoAlarmStore.setActiveRingAlarmId(context, id)
+
+    if (!ExpoAlarmRingService.start(context, id, isBackup)) {
+      presentWithoutService(context, id, options)
+    }
+  }
+
+  /**
+   * The service could not be started. Ring through a notification channel and try the activity
+   * directly — less reliable than the service, but far better than silence.
+   */
+  private fun presentWithoutService(context: Context, id: String, options: ExpoAlarmOptions) {
+    ExpoAlarmNotifications.postFallbackNotification(context, id, options)
+    if (!options.fullScreen) {
+      return
+    }
+    val intent = if (options.fullScreenTarget == FULL_SCREEN_TARGET_APP) {
+      ExpoAlarmNotifications.appIntent(context, id, options)
+    } else {
+      ExpoAlarmRingActivity.intent(context, id)
+    } ?: return
+    runCatching { context.startActivity(intent) }
   }
 
   fun rescheduleAll(context: Context) {
