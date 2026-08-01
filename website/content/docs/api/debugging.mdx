@@ -1,0 +1,73 @@
+---
+title: Debugging
+description: Inspecting what the native layer actually did with your alarm.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+## `getNativeAlarmDebugStateAsync(alarmId)`
+
+Returns native retry and presentation state for a logical alarm id. This is the tool for answering
+"why did the alarm behave differently than I configured it".
+
+```ts
+const state = await ExpoAlarm.getNativeAlarmDebugStateAsync(alarmId);
+```
+
+```ts
+type NativeAlarmDebugState = {
+  alarmId: string;
+  isComplete: boolean;
+  activeRetryAlarmIds: string[];
+  pendingActions: AlarmAction[];
+  pendingHandoff?: AlarmAction | null;
+  intentDebugCounts?: Record<string, number>;
+  currentContext: AlarmContext | null;
+  alertActionMode?: 'default' | 'openMissionOnly';
+  stopButtonIncluded?: boolean;
+  secondaryButtonIncluded?: boolean;
+  secondaryButtonBehavior?: 'openApp' | 'recordOnly' | 'none';
+  stopIntentBehavior?: 'recordOnly' | 'openApp' | 'rescheduleImmediate';
+  alertInitializer?: 'secondaryOnly' | 'legacyStopButton' | 'androidRingService';
+  runtimeSupportsSecondaryOnlyAlert?: boolean;
+  sound?: 'default' | 'named';
+  soundName?: string;
+  isRinging?: boolean;
+  isScheduled?: boolean;
+  canUseFullScreenIntent?: boolean;
+  canScheduleExactAlarms?: boolean;
+};
+```
+
+## Reading `alertInitializer`
+
+This field tells you which alert presentation the runtime actually gave you.
+
+<Callout type="warn">
+If `alertActionMode` is `openMissionOnly` but `alertInitializer` is `legacyStopButton`, the runtime
+required the legacy stop-button presentation and the package **cannot** remove that AlarmKit stop
+affordance. `runtimeSupportsSecondaryOnlyAlert` tells you whether the newer presentation was
+available at all.
+</Callout>
+
+On Android `alertInitializer` is always `androidRingService` — the package owns the ringing surface,
+so there is no system presentation to negotiate with.
+
+## Android live state
+
+Four fields describe the live state of the ringing service and the two grants it depends on:
+
+| Field | Meaning |
+| --- | --- |
+| `isRinging` | The ring service is currently playing this alarm. |
+| `isScheduled` | The alarm is still present in the native store. |
+| `canUseFullScreenIntent` | Android 14+ full-screen grant. |
+| `canScheduleExactAlarms` | Exact alarm grant — see [Android behavior](/platforms/android#exact-alarms-are-mandatory). |
+
+## Completion state
+
+`isComplete` reflects the completion marker set by `completeNativeAlarmAsync()`. While it is `true`,
+`rescheduleImmediate` will not arm new backup alarms for that id. Clear it with
+`resetNativeAlarmCompletionAsync(alarmId)`.
+
+`activeRetryAlarmIds` lists backup and legacy retry alarms currently armed for the logical alarm id.

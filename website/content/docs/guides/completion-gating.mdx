@@ -1,0 +1,129 @@
+---
+title: Completion gating
+description: Build an alarm that keeps ringing until the user finishes something in your app.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+
+A normal alarm has a stop button. A completion-gated alarm does not: the only way out is a button
+that opens your app **while the alarm keeps ringing**, and the ring stops when your app calls
+`completeNativeAlarmAsync()`.
+
+This is the mode you want for wake-up missions, medication confirmations, or anything where
+"the user pressed stop" is not proof they are actually awake.
+
+<Steps>
+
+<Step>
+
+### Schedule with `openMissionOnly`
+
+```ts
+await ExpoAlarm.scheduleAlarmAsync({
+  id: alarmId, // must be a UUID string on iOS
+  hour: 7,
+  minute: 0,
+  title: 'Wake up',
+  ios: {
+    metadata: { mission: 'math', difficulty: 'hard' },
+    alertActionMode: 'openMissionOnly',
+    secondaryButtonTitle: 'Start mission',
+    stopIntentBehavior: 'rescheduleImmediate',
+  },
+  android: {
+    launchUri: 'myapp://mission/alarm-ring',
+    maxRingDurationSeconds: 0, // ring until the app completes it
+  },
+});
+```
+
+`maxRingDurationSeconds: 0` disables Android's ring timeout, so nothing but your app ends the alarm.
+
+</Step>
+
+<Step>
+
+### Route from the native record on launch
+
+Do this on cold launch **and** on every foreground. The handoff slot is written by native code before
+any JS listener runs, which makes it the right source for app-launch routing:
+
+```ts
+const handoff = await ExpoAlarm.getPendingNativeAlarmHandoffAsync();
+const context = handoff ? null : await ExpoAlarm.getCurrentAlarmContextAsync();
+const alarmId = handoff?.alarmId ?? context?.id;
+
+if (alarmId) {
+  router.replace(`/mission/${alarmId}`);
+  await ExpoAlarm.clearPendingNativeAlarmHandoffAsync();
+}
+```
+
+</Step>
+
+<Step>
+
+### Complete only when the user actually finishes
+
+```ts
+await ExpoAlarm.completeNativeAlarmAsync(alarmId);
+await ExpoAlarm.cancelAlarmAsync(alarmId); // then reschedule if the alarm repeats
+```
+
+`completeNativeAlarmAsync` stops future native stop intents from scheduling backup alarms for that
+id, cancels the original native alarm when active, cancels the deterministic backup alarm, and clears
+pending action records for that alarm.
+
+<Callout type="warn">
+On Android this call is what silences the ringing service — it is mandatory, not advisory. With
+`alertActionMode: 'openMissionOnly'` the alarm plays until this call lands.
+</Callout>
+
+</Step>
+
+</Steps>
+
+## How strong the guarantee is per platform
+
+**Android — absolute.** The package owns the ringing surface outright. `openMissionOnly` removes the
+stop button from both the ringing screen and the notification, back gestures are swallowed, and the
+notification is ongoing so it cannot be swiped away. There is no exit but your app.
+
+**iOS — best effort.** The ringing surface belongs to AlarmKit. `openMissionOnly` prefers AlarmKit's
+newer secondary-only alert presentation when the runtime supports it, which omits the
+package-configured stop button. But AlarmKit may still expose system-owned close or stop affordances
+that never invoke the package's App Intents.
+
+The mitigation on iOS is `stopIntentBehavior: 'rescheduleImmediate'`, which re-arms behind a stop:
+
+- Records a `nativeStop` action.
+- Asks iOS to foreground the app.
+- Schedules a short backup AlarmKit timer, which keeps re-arming until JS calls
+  `completeNativeAlarmAsync(alarmId)` or `resetNativeAlarmCompletionAsync(alarmId)`.
+
+Backup alarms use a deterministic native UUID derived from the logical `alarmId`, so each re-arm
+cancels and replaces the previous backup rather than accumulating retry alarms.
+
+Use [`getNativeAlarmDebugStateAsync`](/api/debugging) to check which presentation the runtime actually
+gave you:
+
+```ts
+const state = await ExpoAlarm.getNativeAlarmDebugStateAsync(alarmId);
+
+if (state.alertActionMode === 'openMissionOnly' && state.alertInitializer === 'legacyStopButton') {
+  // The runtime required the legacy stop-button presentation. The package
+  // cannot remove that AlarmKit stop affordance.
+}
+```
+
+## Re-arming manually
+
+If your app processes a handoff and needs a moment before it can present its UI, re-arm explicitly:
+
+```ts
+await ExpoAlarm.scheduleNativeAlarmBackupAsync(handoff.alarmId, 0.1);
+```
+
+Calling this repeatedly replaces the same backup timer instead of stacking new ones. See
+[Backup alarms](/api/completion-and-backup).

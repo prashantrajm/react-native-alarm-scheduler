@@ -1,0 +1,43 @@
+---
+title: System Clock
+description: Android intents for the user's own Clock app.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+## `setSystemAlarmAsync(alarm)`
+
+Android only. Sends an `AlarmClock.ACTION_SET_ALARM` intent to create an alarm in the user's Clock
+app. Returns `false` if no compatible Clock activity is available.
+
+```ts
+const created = await ExpoAlarm.setSystemAlarmAsync({
+  hour: 8,
+  minute: 0,
+  title: 'Leave for work',
+  weekdays: [1, 2, 3, 4, 5],
+  showUi: true,
+});
+```
+
+Takes the same `AlarmScheduleInput` as `scheduleAlarmAsync`, but only `hour`, `minute`, `title`,
+`weekdays` and `showUi` are meaningful — the alarm belongs to the Clock app, so the `ios` and
+`android` presentation blocks do not apply.
+
+<Callout type="error">
+iOS does not expose a public API for creating alarms in the system Clock app, so this method
+**throws** on iOS.
+</Callout>
+
+## `openSystemAlarmAppAsync()`
+
+Opens the Android system Clock alarm screen via `AlarmClock.ACTION_SHOW_ALARMS`.
+
+```ts
+const opened = await ExpoAlarm.openSystemAlarmAppAsync();
+```
+
+On iOS this uses a best-effort Clock URL and may return `false` or do nothing depending on the OS
+version.
+
+See the [System Clock guide](/guides/system-clock) for when to use these instead of app-owned alarms.

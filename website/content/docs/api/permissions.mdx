@@ -1,0 +1,68 @@
+---
+title: Permissions
+description: Checking alarm capability and opening the native settings surfaces.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+## `getPermissionsAsync()`
+
+Returns the current alarm capability state without prompting.
+
+```ts
+const permissions = await ExpoAlarm.getPermissionsAsync();
+```
+
+```ts
+type AlarmPermissionResponse = {
+  platform: 'android' | 'ios';
+  status: 'authorized' | 'denied' | 'notDetermined' | 'unavailable' | 'unknown';
+  canScheduleExactAlarms: boolean;
+  canOpenSettings: boolean;
+  canUseFullScreenIntent?: boolean;
+  canPostNotifications?: boolean;
+};
+```
+
+`canScheduleExactAlarms` is the field to branch on. On Android it reflects whether exact alarm
+scheduling is currently allowed. On iOS it is `true` only when AlarmKit is available and authorized.
+
+`canUseFullScreenIntent` is Android 14+ only: the alarm still rings without it, but it surfaces as a
+heads-up notification instead of taking over a locked screen. `canPostNotifications` is the Android
+13+ `POST_NOTIFICATIONS` grant. Both extra fields are `true` on older Android versions and on iOS.
+
+## `requestPermissionsAsync()`
+
+Requests or opens the native permission surface where possible, then returns the same
+`AlarmPermissionResponse`.
+
+```ts
+const permissions = await ExpoAlarm.requestPermissionsAsync();
+```
+
+On Android 12+ this opens the exact alarm settings screen if exact alarms are not currently allowed.
+On iOS 26+ it requests AlarmKit authorization.
+
+## `openAlarmSettingsAsync()`
+
+Opens the relevant alarm or app settings screen. Returns whether the open action was started.
+
+```ts
+const opened = await ExpoAlarm.openAlarmSettingsAsync();
+```
+
+## `openFullScreenIntentSettingsAsync()`
+
+Android 14+ only. Opens the per-app **Full screen notifications** settings screen.
+
+```ts
+const opened = await ExpoAlarm.openFullScreenIntentSettingsAsync();
+```
+
+Returns `false` on older Android versions, on iOS, on web, and when no matching settings activity
+exists.
+
+<Callout>
+See [Android platform behavior](/platforms/android) for why the exact alarm grant is not optional —
+without it the ringing foreground service cannot start at all.
+</Callout>

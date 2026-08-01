@@ -1,0 +1,93 @@
+---
+title: Quick start
+description: Schedule your first alarm, then handle it when it fires.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+
+<Steps>
+
+<Step>
+
+### Ask for permission
+
+Alarm scheduling is gated on both platforms. Always check before scheduling.
+
+```ts
+import ExpoAlarm from 'react-native-alarm-scheduler';
+
+const permissions = await ExpoAlarm.requestPermissionsAsync();
+
+if (!permissions.canScheduleExactAlarms) {
+  // Send the user to settings and explain why the alarm needs this.
+  await ExpoAlarm.openAlarmSettingsAsync();
+}
+```
+
+On Android 12+ this opens the exact alarm settings screen when exact alarms are not allowed. On
+iOS 26+ it requests AlarmKit authorization.
+
+</Step>
+
+<Step>
+
+### Schedule an alarm
+
+```ts
+const alarm = await ExpoAlarm.scheduleAlarmAsync({
+  hour: 7,
+  minute: 30,
+  title: 'Morning alarm',
+  weekdays: [1, 2, 3, 4, 5],
+});
+
+console.log(alarm.id, alarm.timestamp);
+```
+
+`hour` is 24-hour time (`0`–`23`), `minute` is `0`–`59`, and `weekdays` uses ISO numbering where
+`1` is Monday and `7` is Sunday. Omit `weekdays` for a one-shot alarm; omit `timestamp` and the
+module schedules the next matching time.
+
+</Step>
+
+<Step>
+
+### Handle the alarm when it fires
+
+Events only arrive when a JS runtime happens to be alive. The reliable pattern is to reconcile from
+the native records on every launch and foreground:
+
+```ts
+const handoff = await ExpoAlarm.getPendingNativeAlarmHandoffAsync();
+const context = handoff ? null : await ExpoAlarm.getCurrentAlarmContextAsync();
+const alarmId = handoff?.alarmId ?? context?.id;
+
+if (alarmId) {
+  router.replace(`/alarm/${alarmId}`);
+  await ExpoAlarm.clearPendingNativeAlarmHandoffAsync();
+}
+```
+
+</Step>
+
+<Step>
+
+### List and cancel
+
+```ts
+const alarms = await ExpoAlarm.getScheduledAlarmsAsync();
+
+for (const alarm of alarms) {
+  await ExpoAlarm.cancelAlarmAsync(alarm.id);
+}
+```
+
+</Step>
+
+</Steps>
+
+<Callout title="Next">
+That is a normal alarm — the user can stop it. To build one they cannot dismiss until they finish
+something in your app, see [Completion gating](/guides/completion-gating).
+</Callout>

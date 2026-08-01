@@ -1,0 +1,102 @@
+---
+title: Android
+description: Exact alarms, the ringing service, reboots, and the OEM problem.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+Android exact alarm behavior depends on OS version, target SDK, user settings and Play policy. The
+module checks `canScheduleExactAlarms()` before reporting alarm capability, and uses `setAlarmClock()`
+for user-visible alarm semantics.
+
+## Exact alarms are mandatory
+
+If exact alarms are denied, call `requestPermissionsAsync()` or `openAlarmSettingsAsync()` and ask the
+user to enable **Alarms & reminders** for your app.
+
+<Callout type="error" title="Treat this as required, not optional">
+Without the grant the package falls back to `setAndAllowWhileIdle()`, which loses more than timing
+accuracy. Android only exempts *exact* alarms from the background foreground-service restriction, so
+the ringing service cannot start either. The package then degrades again to a full-screen-intent
+notification that rings through its own channel — audible, but no wake lock and no guaranteed screen
+takeover.
+</Callout>
+
+```ts
+const p = await ExpoAlarm.getPermissionsAsync();
+
+if (!p.canScheduleExactAlarms) {
+  await ExpoAlarm.requestPermissionsAsync();
+}
+```
+
+## What happens when an alarm fires
+
+1. `AlarmManager` delivers the broadcast to the package's receiver, even in Doze. Repeating alarms
+   re-arm their next occurrence immediately.
+2. The receiver starts a foreground service, which takes a wake lock, pins the alarm stream volume,
+   and starts looping the alarm sound. The service outlives the receiver's 10-second window and does
+   not need a JS runtime.
+3. The service posts an ongoing, full-screen-intent notification and launches the ringing screen
+   directly — `setAlarmClock()` grants the background activity-start allowance that makes this legal.
+4. Before anything else, the handoff and action records are written to disk, so a cold-launched app
+   can route correctly no matter how it was opened.
+5. The alarm keeps ringing until `completeNativeAlarmAsync(alarmId)`, an explicit stop, or
+   `maxRingDurationSeconds`.
+
+## Android 14+ full-screen intents
+
+Android 14 gates full-screen notifications behind a per-app grant. Apps whose declared category is an
+alarm clock get it by default; others must ask.
+
+```ts
+const p = await ExpoAlarm.getPermissionsAsync();
+
+if (p.canUseFullScreenIntent === false) {
+  await ExpoAlarm.openFullScreenIntentSettingsAsync();
+}
+```
+
+Without the grant the alarm still rings and still posts a heads-up notification — it just does not
+take over a locked screen.
+
+## The ringing surface
+
+- `fullScreenTarget: 'native'` (default) shows the package's own lock-screen ring screen, which
+  appears instantly even from a cold start. Use `'app'` only if your own launch activity sets
+  `showWhenLocked`, otherwise it opens behind the keyguard.
+- `launchUri` is the deep link opened when the user hands off, for example
+  `'myapp://mission/alarm-ring'`. `{alarmId}` is substituted when present; otherwise `?alarmId=` is
+  appended.
+- `maxRingDurationSeconds` (default `300`) time-boxes the ring for battery's sake. Set `0` to ring
+  until the app completes the alarm.
+- `alertActionMode: 'openMissionOnly'` removes the stop button from both the ringing screen and the
+  notification. Back gestures are swallowed and the notification is ongoing, so it cannot be swiped
+  away.
+- `stopIntentBehavior: 'rescheduleImmediate'` arms a backup alarm whenever the user stops without
+  completing — including when a ring hits `maxRingDurationSeconds`. Backup ids are deterministic
+  (`<alarmId>#backup`), so re-arming replaces rather than accumulates.
+
+## Reboots, updates and clock changes
+
+Alarms are stored natively and re-armed on `BOOT_COMPLETED`, `MY_PACKAGE_REPLACED`, `TIME_SET` and
+`TIMEZONE_CHANGED`. One-shot alarms whose time passed while the device was off are dropped, matching
+the behavior of the system Clock app.
+
+## OEM battery optimization
+
+Aggressive OEM power managers (Xiaomi, Oppo, Vivo, Samsung, Huawei) can kill background processes in
+ways `setAlarmClock` does not fully protect against.
+
+There is no API that fixes this. The standard mitigation is to detect those devices and ask users to
+disable battery optimization for your app and to allow autostart.
+
+## Inspecting live state
+
+```ts
+const state = await ExpoAlarm.getNativeAlarmDebugStateAsync(alarmId);
+// state.isRinging, state.isScheduled,
+// state.canUseFullScreenIntent, state.canScheduleExactAlarms
+```
+
+On Android `alertInitializer` is always `androidRingService`.

@@ -1,0 +1,54 @@
+---
+title: Events
+description: Foreground listeners, and why they are never the whole story.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+```ts
+const subscription = ExpoAlarm.addListener('onAlarmTriggered', (alarm) => {
+  console.log(alarm);
+});
+
+const actionSubscription = ExpoAlarm.addListener('onAlarmAction', (action) => {
+  console.log(action);
+});
+
+const stateSubscription = ExpoAlarm.addListener('onAlarmStateChange', (event) => {
+  console.log(event);
+});
+
+subscription.remove();
+actionSubscription.remove();
+stateSubscription.remove();
+```
+
+## Payloads
+
+```ts
+type ExpoAlarmModuleEvents = {
+  onAlarmTriggered: (alarm: ScheduledAlarm) => void;
+  onAlarmAction: (action: AlarmAction) => void;
+  onAlarmStateChange: (event: AlarmStateChange) => void;
+};
+
+type AlarmStateChange = {
+  id: string;
+  state: 'scheduled' | 'alerting' | 'countdown' | 'paused';
+  timestamp: number;
+  metadata?: AlarmMetadata;
+};
+```
+
+<Callout type="warn" title="Events are best effort">
+They are delivered only when a JS runtime happens to be alive — which, for an alarm that fires at
+7am with the app killed, is usually not the case.
+</Callout>
+
+Everything the events carry is also persisted natively. The reliable pattern on both platforms is:
+
+1. Handle the event if it arrives.
+2. Reconcile from `getPendingNativeAlarmHandoffAsync()`, `getPendingAlarmActionsAsync()` and
+   `getCurrentAlarmContextAsync()` on **every launch and foreground**.
+
+See [Handoffs and actions](/guides/handoff-and-actions) for the full pattern.

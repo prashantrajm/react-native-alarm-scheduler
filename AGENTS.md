@@ -22,6 +22,25 @@ The public npm package name is `react-native-alarm-scheduler`; the native module
 
 Keep the README capability table honest when changing native behavior.
 
+## Documentation
+
+The docs site is Fumadocs on Astro, in `website/`, deployed to
+<https://react-native-alarm-scheduler.vercel.app> on Vercel. It is a separate npm project with its
+own lockfile and is excluded from the published package.
+
+- Content: `website/content/docs/**/*.mdx`, ordered by `meta.json` in each folder.
+- Sidebar/nav: `website/src/components/docs.tsx`.
+- Build: `cd website && npm install && npm run build` (output in `website/dist`).
+- Vercel project root directory must be `website`, not the repo root.
+
+Do not use `<Tabs>` or the `package-install` / `remarkCodeTab` code fences in MDX. Astro renders MDX
+content server-side and passes it into the `<Docs>` React island as slot children, so React context
+never reaches it and any context-dependent component throws at build time. `Callout`, `Steps` and
+`Cards` are context-free and work.
+
+When native behavior changes, update the affected pages under `website/content/docs/` as well as the
+README capability table.
+
 ## Verification
 
 Run before pushing meaningful changes:

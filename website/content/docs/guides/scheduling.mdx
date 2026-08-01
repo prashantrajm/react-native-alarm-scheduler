@@ -1,0 +1,97 @@
+---
+title: Scheduling alarms
+description: One-shot alarms, repeating alarms, and how platform options are shared.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+## One-shot and repeating
+
+Pass `weekdays` for a repeating alarm, or leave it out for a one-shot:
+
+```ts
+// Repeats every weekday at 07:30
+await ExpoAlarm.scheduleAlarmAsync({
+  hour: 7,
+  minute: 30,
+  title: 'Standup',
+  weekdays: [1, 2, 3, 4, 5],
+});
+
+// Fires once, at the next 07:30
+await ExpoAlarm.scheduleAlarmAsync({ hour: 7, minute: 30 });
+```
+
+Weekdays use ISO numbering: `1` is Monday through `7` is Sunday.
+
+To target an exact moment instead, pass `timestamp` in milliseconds since the Unix epoch. When
+omitted, the module schedules the next occurrence matching `hour` and `minute`.
+
+## Alarm ids
+
+```ts
+await ExpoAlarm.scheduleAlarmAsync({ id: myId, hour: 7, minute: 0 });
+```
+
+Android accepts any string `id`. **iOS AlarmKit requires a UUID string** when you provide one. If you
+want to control ids on both platforms, generate UUIDs. Omit `id` and the module generates one for you
+and returns it on the resulting `ScheduledAlarm`.
+
+## Android inherits the iOS options
+
+Every `android` option that means the same thing as an `ios` option falls back to the `ios` value
+when omitted:
+
+`metadata`, `alertTitle`, `alertActionMode`, `stopButtonTitle`, `secondaryButtonTitle`,
+`stopIntentBehavior`, `secondaryButtonBehavior` and `soundName`.
+
+An app already written against the AlarmKit flow gets the same behavior on Android without passing an
+`android` block at all. Set `android` fields only where the two platforms should genuinely differ:
+
+```ts
+await ExpoAlarm.scheduleAlarmAsync({
+  hour: 7,
+  minute: 0,
+  ios: {
+    alertActionMode: 'openMissionOnly',
+    secondaryButtonTitle: 'Start mission',
+    metadata: { mission: 'math' },
+  },
+  // Inherits all three above. Only adds what is Android-specific.
+  android: {
+    launchUri: 'myapp://mission/alarm-ring',
+    maxRingDurationSeconds: 0,
+  },
+});
+```
+
+## Metadata
+
+`metadata` is a flat record of strings, numbers and booleans carried through the alarm and handed
+back on the fired alarm, on action records, and on the alarm context. Use it to store routing
+information:
+
+```ts
+await ExpoAlarm.scheduleAlarmAsync({
+  hour: 7,
+  minute: 0,
+  ios: { metadata: { route: 'alarm-detail', mission: 'math' } },
+});
+```
+
+The package always adds `alarmId` and `title` to iOS AlarmKit metadata.
+
+<Callout>
+iOS presentation options customize AlarmKit text only. They are not Android-style launch intents and
+cannot force a React Native route — read the metadata back on launch and navigate from JavaScript.
+See [Handoffs and actions](/guides/handoff-and-actions).
+</Callout>
+
+## Listing and cancelling
+
+```ts
+const alarms = await ExpoAlarm.getScheduledAlarmsAsync();
+const removed = await ExpoAlarm.cancelAlarmAsync(alarms[0].id);
+```
+
+`cancelAlarmAsync` returns `true` when a native or stored alarm was actually removed.

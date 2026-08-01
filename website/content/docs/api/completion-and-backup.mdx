@@ -1,0 +1,82 @@
+---
+title: Completion and backup
+description: Ending a completion-gated alarm and managing backup timers.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+## `completeNativeAlarmAsync(alarmId)`
+
+Marks the native alarm flow complete. Call this **only** after the user satisfies your app's
+completion condition.
+
+```ts
+await ExpoAlarm.completeNativeAlarmAsync(alarmId);
+```
+
+It does all of the following:
+
+- Stops future native stop intents from scheduling backup alarms for that `alarmId`.
+- Cancels the original native alarm when active.
+- Cancels the deterministic backup alarm and any legacy tracked retry alarms for that logical id.
+- Clears pending native action records for that alarm.
+
+<Callout type="warn" title="Mandatory on Android">
+This is what silences the ringing service. With `alertActionMode: 'openMissionOnly'` the alarm keeps
+playing until this call lands.
+</Callout>
+
+Completing does not cancel a *repeating* alarm's future occurrences — call `cancelAlarmAsync` and
+reschedule if that is what you want.
+
+## `scheduleNativeAlarmBackupAsync(alarmId, delaySeconds?)`
+
+Schedules a short backup alarm for an existing logical alarm id — an AlarmKit timer on iOS 26+, an
+exact `setAlarmClock` on Android.
+
+```ts
+const backup = await ExpoAlarm.scheduleNativeAlarmBackupAsync(alarmId, 0.1);
+```
+
+```ts
+type NativeAlarmBackupResult = {
+  alarmId: string;
+  backupAlarmId: string;
+  scheduled: boolean;
+  scheduledFor?: number;
+  delaySeconds: number;
+};
+```
+
+The backup id is deterministic for the primary alarm id, so calling this repeatedly cancels and
+replaces the same backup timer instead of stacking new ones.
+
+Use it when your app processes a native handoff from `getPendingNativeAlarmHandoffAsync()`, or finds
+an alerting alarm from `getCurrentAlarmContextAsync()`, and needs to re-arm before presenting its UI.
+
+## `cancelNativeAlarmBackupAsync(alarmId)`
+
+Cancels the deterministic backup timer for a logical alarm id and removes any legacy retry ids
+tracked by older package versions.
+
+```ts
+const cancelled = await ExpoAlarm.cancelNativeAlarmBackupAsync(alarmId);
+```
+
+## `resetNativeAlarmCompletionAsync(alarmId)`
+
+Clears the completion marker for an alarm id, allowing `rescheduleImmediate` retries again for that
+id. Use this when a repeating alarm needs to arm again after a previous completion.
+
+```ts
+await ExpoAlarm.resetNativeAlarmCompletionAsync(alarmId);
+```
+
+## `clearBypassAsync(alarmId)`
+
+Older alias for `resetNativeAlarmCompletionAsync(alarmId)`. Identical behavior — prefer the newer
+name for clarity.
+
+```ts
+await ExpoAlarm.clearBypassAsync(alarmId);
+```

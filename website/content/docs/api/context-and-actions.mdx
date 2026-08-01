@@ -1,0 +1,115 @@
+---
+title: Context and actions
+description: Reading what the native layer recorded while JS was not running.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+## `getCurrentAlarmContextAsync()`
+
+Returns alarm context for app launch or resume routing, or `null`.
+
+```ts
+const context = await ExpoAlarm.getCurrentAlarmContextAsync();
+```
+
+```ts
+type AlarmContext = {
+  id: string;
+  metadata?: AlarmMetadata;
+  state?: 'scheduled' | 'alerting' | 'countdown' | 'paused';
+  nativeAlarmId?: string;
+};
+```
+
+On **iOS 26+** this reads AlarmKit alarms owned by the app and joins them with metadata stored by the
+package. If the active native alarm is the deterministic backup timer, `id` remains the original
+logical alarm id and `nativeAlarmId` contains the backup UUID. If a one-shot alarm recently fired and
+AlarmKit already removed it from the daemon store, the package can still return the stored metadata
+for a short recovery window.
+
+On **Android** this returns the currently ringing alarm with `state: 'alerting'`, falling back to a
+one-shot alarm that fired within the last hour and was never completed — the same recovery window as
+iOS.
+
+On **web** this returns `null`.
+
+## `getPendingNativeAlarmHandoffAsync()`
+
+Returns the latest native handoff recorded by the package, or `null`.
+
+```ts
+const handoff = await ExpoAlarm.getPendingNativeAlarmHandoffAsync();
+
+if (handoff?.action === 'nativeStop' || handoff?.action === 'secondaryOpen') {
+  await ExpoAlarm.scheduleNativeAlarmBackupAsync(handoff.alarmId, 0.1);
+  // route to your alarm handling UI
+}
+```
+
+This is a **single durable slot** written by native code before any JS listener runs, which makes it
+the right source for app-launch routing.
+
+On iOS the slot is written by the AlarmKit App Intent when the user presses a button. On Android it
+is written the moment the alarm starts ringing, so a cold-launched app can route straight to its
+alarm UI without waiting for a JS event.
+
+## `clearPendingNativeAlarmHandoffAsync()`
+
+Clears the durable native handoff slot. Call it after your app has consumed the handoff.
+
+```ts
+await ExpoAlarm.clearPendingNativeAlarmHandoffAsync();
+```
+
+<Callout>
+This does not clear the full action history returned by `getPendingAlarmActionsAsync()`.
+</Callout>
+
+## `getPendingAlarmActionsAsync()`
+
+Returns native action records that happened while JS may not have been running — AlarmKit App Intents
+on iOS, ringing-service events on Android.
+
+```ts
+const actions = await ExpoAlarm.getPendingAlarmActionsAsync();
+```
+
+```ts
+type AlarmAction = {
+  id: string;
+  alarmId: string;
+  action: 'nativeStop' | 'secondaryOpen' | 'snooze' | 'dismiss';
+  timestamp: number;
+  foregroundRequested?: boolean;
+  rescheduled?: boolean;
+  rescheduledAlarmId?: string;
+  retryScheduledFor?: number;
+  backupAlarmId?: string;
+  backupScheduledFor?: number;
+  backupDelaySeconds?: number;
+  trigger?: boolean;
+  timedOut?: boolean;
+};
+```
+
+<Callout type="warn">
+`nativeStop` means the user pressed the system alarm stop control. Treat it as a bypass signal, not
+as successful completion.
+</Callout>
+
+Two fields are Android-only:
+
+- `trigger: true` on a `secondaryOpen` record means it was written by the alarm firing rather than by
+  a user tap.
+- `timedOut: true` on a `dismiss` record means the ring hit `maxRingDurationSeconds`.
+
+## `clearPendingAlarmActionsAsync(ids?)`
+
+Clears pending native action records. Pass action record `id` values to clear specific records, or
+omit `ids` to clear all of them.
+
+```ts
+await ExpoAlarm.clearPendingAlarmActionsAsync([action.id]);
+await ExpoAlarm.clearPendingAlarmActionsAsync();
+```

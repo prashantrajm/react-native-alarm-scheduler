@@ -1,0 +1,14 @@
+{
+  "title": "API reference",
+  "pages": [
+    "index",
+    "permissions",
+    "scheduling",
+    "context-and-actions",
+    "completion-and-backup",
+    "system-clock",
+    "debugging",
+    "events",
+    "types"
+  ]
+}
