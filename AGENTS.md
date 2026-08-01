@@ -31,7 +31,16 @@ own lockfile and is excluded from the published package.
 - Content: `website/content/docs/**/*.mdx`, ordered by `meta.json` in each folder.
 - Sidebar/nav: `website/src/components/docs.tsx`.
 - Build: `cd website && npm install && npm run build` (output in `website/dist`).
-- Vercel project root directory must be `website`, not the repo root.
+Vercel settings this build depends on:
+
+- **Root Directory** must be `website`, not the repo root.
+- **"Include source files outside of the Root Directory in the Build Step" must be OFF.** With it on,
+  Vite walks up from `website/` and parses the repo-root `tsconfig.json`, which extends
+  `expo-module-scripts/tsconfig.base`. Vercel only installs `website/`'s dependencies, so that
+  package is absent and `astro sync` fails with `Tsconfig not found expo-module-scripts/tsconfig.base`.
+  Nothing in `website/` references the parent directory, so excluding it is safe.
+
+To reproduce that failure locally: `mv node_modules/expo-module-scripts /tmp && cd website && npm run build`.
 
 Do not use `<Tabs>` or the `package-install` / `remarkCodeTab` code fences in MDX. Astro renders MDX
 content server-side and passes it into the `<Docs>` React island as slot children, so React context
