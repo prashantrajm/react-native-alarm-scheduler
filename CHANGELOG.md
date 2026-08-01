@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.1
+
+Documentation only. No runtime, API or native behavior changes.
+
+### 📝 Documentation
+
+- Rewrite the README as a landing page — features, install, usage and the platform capability table —
+  instead of a full API reference. The npm package page now shows this rather than the previous
+  600-line document.
+- Add a documentation site at <https://react-native-alarm-scheduler.vercel.app> covering guides,
+  per-platform behavior and the complete API reference.
+- Add the MIT `LICENSE` file that `package.json` already declared. It is now included in the
+  published tarball.
+
 ## 0.2.0
 
 No TypeScript API was removed or changed incompatibly, and iOS behavior is untouched. Android
