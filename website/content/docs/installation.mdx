@@ -1,0 +1,79 @@
+---
+title: Installation
+description: Install the package and configure the Expo config plugin.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+```sh
+npm install react-native-alarm-scheduler
+```
+
+<Callout type="warn" title="Not available in Expo Go">
+This module ships native code. Use a development build or a prebuilt native app.
+Bare React Native apps need [Expo Modules](https://docs.expo.dev/bare/installing-expo-modules/)
+installed and configured first; Expo apps already include the required runtime.
+</Callout>
+
+## Add the config plugin
+
+Add the plugin to your app config before running `expo prebuild`:
+
+```json title="app.json"
+{
+  "expo": {
+    "plugins": [
+      [
+        "react-native-alarm-scheduler",
+        {
+          "alarmKitUsageDescription": "Allow this app to schedule alarms.",
+          "addExactAlarmPermission": true,
+          "addNotificationPermission": true,
+          "iosAlarmSounds": ["./assets/audio/bollywood-alarm.mp3"]
+        }
+      ]
+    ]
+  }
+}
+```
+
+Then rebuild the native projects:
+
+```sh
+npx expo prebuild
+npx expo run:android
+npx expo run:ios
+```
+
+## Plugin options
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `alarmKitUsageDescription` | `string` | `Allow this app to schedule alarms that can alert you at the selected time.` | Adds `NSAlarmKitUsageDescription` for iOS AlarmKit authorization. |
+| `addExactAlarmPermission` | `boolean` | `true` | Adds `android.permission.SCHEDULE_EXACT_ALARM`. |
+| `addNotificationPermission` | `boolean` | `true` | Adds `android.permission.POST_NOTIFICATIONS`. |
+| `addUseExactAlarmPermission` | `boolean` | `false` | Adds `android.permission.USE_EXACT_ALARM`, which is granted without prompting. Google Play only allows it for apps whose core function is an alarm clock or calendar. |
+| `iosAlarmSounds` | `string[]` | `[]` | Adds custom sound files to the iOS app bundle Resources build phase so AlarmKit can resolve them by filename. |
+
+The plugin also enables `NSSupportsLiveActivities` for iOS AlarmKit intents and adds
+`com.android.alarm.permission.SET_ALARM` for Android system Clock alarm intents.
+
+## What the package adds on its own
+
+You do not need to declare anything else. The package's own Android manifest contributes the
+permissions the ringing layer needs — `WAKE_LOCK`, `VIBRATE`, `RECEIVE_BOOT_COMPLETED`,
+`USE_FULL_SCREEN_INTENT`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE`, `DISABLE_KEYGUARD`
+and `TURN_SCREEN_ON` — plus the ringing service, the lock-screen ring activity, and the boot receiver.
+
+<Callout title="Play Console justification">
+The foreground service is declared as `specialUse` with the subtype `alarm`. Play Console asks for a
+short justification for that type; "the service plays the alarm and keeps the ringing UI alive until
+the user completes the wake-up flow" is the honest one.
+</Callout>
+
+## Requirements
+
+- Android API 24+.
+- iOS 15.1+ for package compatibility.
+- iOS 26 SDK **and** iOS 26 runtime for actual AlarmKit scheduling. Older iOS versions report
+  `status: 'unavailable'`.

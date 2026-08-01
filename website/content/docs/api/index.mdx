@@ -1,0 +1,66 @@
+---
+title: Overview
+description: Every method exposed by the default export, grouped by what it does.
+---
+
+The package has a single default export:
+
+```ts
+import ExpoAlarm from 'react-native-alarm-scheduler';
+```
+
+All types are also exported as named exports from the same module.
+
+## Permissions
+
+| Method | Returns |
+| --- | --- |
+| [`getPermissionsAsync()`](/api/permissions#getpermissionsasync) | `AlarmPermissionResponse` |
+| [`requestPermissionsAsync()`](/api/permissions#requestpermissionsasync) | `AlarmPermissionResponse` |
+| [`openAlarmSettingsAsync()`](/api/permissions#openalarmsettingsasync) | `boolean` |
+| [`openFullScreenIntentSettingsAsync()`](/api/permissions#openfullscreenintentsettingsasync) | `boolean` |
+
+## Scheduling
+
+| Method | Returns |
+| --- | --- |
+| [`scheduleAlarmAsync(alarm)`](/api/scheduling#schedulealarmasync) | `ScheduledAlarm` |
+| [`cancelAlarmAsync(id)`](/api/scheduling#cancelalarmasync) | `boolean` |
+| [`getScheduledAlarmsAsync()`](/api/scheduling#getscheduledalarmsasync) | `ScheduledAlarm[]` |
+
+## Context and actions
+
+| Method | Returns |
+| --- | --- |
+| [`getCurrentAlarmContextAsync()`](/api/context-and-actions#getcurrentalarmcontextasync) | `AlarmContext \| null` |
+| [`getPendingNativeAlarmHandoffAsync()`](/api/context-and-actions#getpendingnativealarmhandoffasync) | `AlarmAction \| null` |
+| [`clearPendingNativeAlarmHandoffAsync()`](/api/context-and-actions#clearpendingnativealarmhandoffasync) | `void` |
+| [`getPendingAlarmActionsAsync()`](/api/context-and-actions#getpendingalarmactionsasync) | `AlarmAction[]` |
+| [`clearPendingAlarmActionsAsync(ids?)`](/api/context-and-actions#clearpendingalarmactionsasync) | `void` |
+
+## Completion and backup
+
+| Method | Returns |
+| --- | --- |
+| [`completeNativeAlarmAsync(alarmId)`](/api/completion-and-backup#completenativealarmasync) | `void` |
+| [`scheduleNativeAlarmBackupAsync(alarmId, delaySeconds?)`](/api/completion-and-backup#schedulenativealarmbackupasync) | `NativeAlarmBackupResult` |
+| [`cancelNativeAlarmBackupAsync(alarmId)`](/api/completion-and-backup#cancelnativealarmbackupasync) | `boolean` |
+| [`resetNativeAlarmCompletionAsync(alarmId)`](/api/completion-and-backup#resetnativealarmcompletionasync) | `void` |
+| [`clearBypassAsync(alarmId)`](/api/completion-and-backup#clearbypassasync) | `void` |
+
+## System Clock (Android)
+
+| Method | Returns |
+| --- | --- |
+| [`setSystemAlarmAsync(alarm)`](/api/system-clock#setsystemalarmasync) | `boolean` |
+| [`openSystemAlarmAppAsync()`](/api/system-clock#opensystemalarmappasync) | `boolean` |
+
+## Debugging
+
+| Method | Returns |
+| --- | --- |
+| [`getNativeAlarmDebugStateAsync(alarmId)`](/api/debugging) | `NativeAlarmDebugState` |
+
+## Events
+
+[`onAlarmTriggered`, `onAlarmAction`, `onAlarmStateChange`](/api/events)

@@ -1,0 +1,49 @@
+---
+title: System Clock integration
+description: Creating alarms in the user's Clock app on Android.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+Separate from app-owned alarms, Android lets you hand an alarm to the user's own Clock app. The alarm
+then belongs to the Clock app: it survives your app being uninstalled, and your app has no control
+over it afterwards.
+
+```ts
+const created = await ExpoAlarm.setSystemAlarmAsync({
+  hour: 8,
+  minute: 0,
+  title: 'Leave for work',
+  weekdays: [1, 2, 3, 4, 5],
+  showUi: true,
+});
+```
+
+`showUi: true` opens the Clock app's create-alarm screen prefilled, letting the user confirm.
+Returns `false` if no compatible Clock activity is available.
+
+Open the Clock app's alarm list:
+
+```ts
+await ExpoAlarm.openSystemAlarmAppAsync();
+```
+
+<Callout type="warn" title="iOS cannot do this">
+iOS exposes no public API for creating alarms in the system Clock app, so `setSystemAlarmAsync`
+**throws** on iOS. `openSystemAlarmAppAsync` uses a best-effort Clock URL and may return `false` or
+do nothing depending on the OS version.
+</Callout>
+
+## Which should you use?
+
+| | App-owned alarm | System Clock alarm |
+| --- | --- | --- |
+| Platform | Android + iOS | Android only |
+| Your app controls it | ✅ | ❌ |
+| Completion gating | ✅ | ❌ |
+| Custom sound and UI | ✅ | ❌ |
+| Survives app uninstall | ❌ | ✅ |
+| Appears in the user's Clock app | ❌ | ✅ |
+
+Use `scheduleAlarmAsync` for anything your app needs to control. Use `setSystemAlarmAsync` when the
+user is really asking for a plain alarm and would expect to find it in their Clock app.

@@ -1,0 +1,89 @@
+---
+title: Custom alarm sounds
+description: Bundling and selecting a custom alarm sound on each platform.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+## iOS
+
+Add the file to the config plugin so prebuild copies it into the app bundle's Resources build phase:
+
+```json title="app.json"
+{
+  "expo": {
+    "plugins": [
+      [
+        "react-native-alarm-scheduler",
+        { "iosAlarmSounds": ["./assets/audio/bollywood-alarm.mp3"] }
+      ]
+    ]
+  }
+}
+```
+
+Then reference it by its exact bundled filename, **including the extension**:
+
+```ts
+await ExpoAlarm.scheduleAlarmAsync({
+  hour: 7,
+  minute: 0,
+  ios: { soundName: 'bollywood-alarm.mp3' },
+});
+```
+
+`ios.soundName` maps to AlarmKit's `AlertConfiguration.AlertSound.named(soundName)`. Omit it to use
+the system default sound.
+
+## Android
+
+Put the file in `android/app/src/main/res/raw` and reference it by name — the extension is optional:
+
+```ts
+await ExpoAlarm.scheduleAlarmAsync({
+  hour: 7,
+  minute: 0,
+  android: { soundName: 'bollywood_alarm' },
+});
+```
+
+Or pass any content or resource URI, which takes precedence over `soundName`:
+
+```ts
+await ExpoAlarm.scheduleAlarmAsync({
+  hour: 7,
+  minute: 0,
+  android: { soundUri: 'content://media/internal/audio/media/42' },
+});
+```
+
+If neither resolves, the package falls back to the system alarm ringtone.
+
+<Callout title="res/raw filenames">
+Android resource names must be lowercase, and may only contain letters, digits and underscores.
+`bollywood-alarm.mp3` is not a valid raw resource name — use `bollywood_alarm.mp3`.
+</Callout>
+
+## Staying audible on Android
+
+Playback loops on `STREAM_ALARM`, which ignores the ringer and Do Not Disturb. On top of that, the
+package defends against the volume-down escape hatch:
+
+```ts
+await ExpoAlarm.scheduleAlarmAsync({
+  hour: 7,
+  minute: 0,
+  android: {
+    enforceVolume: true, // default — pin the alarm stream for the ring
+    restoreVolume: true, // default — put it back afterwards
+    volume: 1, // fraction of max alarm volume, 0–1
+    vibrate: true, // default
+  },
+});
+```
+
+With `enforceVolume` on (the default), the alarm stream is pinned at `volume` for the duration of the
+ring and re-raised whenever anything lowers it, then the user's original level is restored unless
+`restoreVolume` is `false`.
+
+iOS alarm volume is owned by AlarmKit and is not configurable from the package.

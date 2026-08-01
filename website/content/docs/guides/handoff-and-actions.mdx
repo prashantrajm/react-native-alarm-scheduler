@@ -1,0 +1,92 @@
+---
+title: Handoffs and actions
+description: Knowing why your app opened, even when it was killed when the alarm fired.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+An alarm frequently fires while your JS runtime is not running. The package therefore records
+everything natively, on disk, before any JavaScript executes — and exposes three read paths.
+
+## The three sources
+
+| Source | What it holds | Use it for |
+| --- | --- | --- |
+| `getPendingNativeAlarmHandoffAsync()` | A single durable slot: the latest native handoff | App-launch routing |
+| `getPendingAlarmActionsAsync()` | The full history of native action records | Reconciling what happened |
+| `getCurrentAlarmContextAsync()` | The alarm that is alerting or recently fired | Resume routing |
+
+`getPendingNativeAlarmHandoffAsync()` is the one you want for routing. On iOS it is written by the
+AlarmKit App Intent when the user presses a button. On Android it is written the moment the alarm
+starts ringing, so a cold-launched app can route straight to its alarm UI without waiting for a JS
+event.
+
+## The launch pattern
+
+Run this on cold launch and on every foreground:
+
+```ts
+async function reconcileAlarms() {
+  const handoff = await ExpoAlarm.getPendingNativeAlarmHandoffAsync();
+  const context = handoff ? null : await ExpoAlarm.getCurrentAlarmContextAsync();
+  const alarmId = handoff?.alarmId ?? context?.id;
+
+  if (!alarmId) return;
+
+  if (handoff?.action === 'nativeStop') {
+    // The user pressed the system stop control. Not proof of completion —
+    // re-arm before presenting UI.
+    await ExpoAlarm.scheduleNativeAlarmBackupAsync(alarmId, 0.1);
+  }
+
+  router.replace(`/alarm/${alarmId}`);
+  await ExpoAlarm.clearPendingNativeAlarmHandoffAsync();
+}
+```
+
+<Callout type="warn">
+`nativeStop` means the user pressed the system alarm stop control. Treat it as a bypass signal, not
+as successful completion.
+</Callout>
+
+`clearPendingNativeAlarmHandoffAsync()` clears only the durable slot. It does not clear the full
+action history — use `clearPendingAlarmActionsAsync(ids?)` for that.
+
+## Action records
+
+```ts
+const actions = await ExpoAlarm.getPendingAlarmActionsAsync();
+```
+
+Each record carries an `action` of `nativeStop`, `secondaryOpen`, `snooze` or `dismiss`, plus
+context about what the package did in response — whether it asked iOS to foreground the app
+(`foregroundRequested`), whether it re-armed (`rescheduled`, `backupAlarmId`, `backupScheduledFor`).
+
+Two fields are Android-only:
+
+- `trigger: true` on a `secondaryOpen` record means it was written by the alarm firing, not by a user tap.
+- `timedOut: true` on a `dismiss` record means the ring hit `maxRingDurationSeconds`.
+
+Clear records once consumed:
+
+```ts
+await ExpoAlarm.clearPendingAlarmActionsAsync(actions.map((a) => a.id));
+await ExpoAlarm.clearPendingAlarmActionsAsync(); // or clear everything
+```
+
+## Events are a bonus, not the mechanism
+
+```ts
+const subscription = ExpoAlarm.addListener('onAlarmTriggered', (alarm) => {
+  console.log(alarm);
+});
+
+subscription.remove();
+```
+
+There are three: `onAlarmTriggered`, `onAlarmAction` and `onAlarmStateChange`. They are delivered only
+when a JS runtime happens to be alive.
+
+Everything they carry is also persisted natively, so the reliable pattern on both platforms is:
+**handle the event if it arrives, and reconcile from the async getters on every launch and
+foreground.** Never rely on an event alone.

@@ -1,0 +1,85 @@
+---
+title: iOS
+description: AlarmKit requirements, App Intents, and what public APIs do not allow.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+iOS alarm scheduling uses AlarmKit. The app must:
+
+- Build with an SDK that includes AlarmKit.
+- Run on iOS 26 or newer.
+- Include a non-empty `NSAlarmKitUsageDescription`.
+- Receive user authorization through `requestPermissionsAsync()`.
+
+Older iOS versions return `status: 'unavailable'`. `canScheduleExactAlarms` is `true` only when
+AlarmKit is available *and* authorized.
+
+## No launch routing
+
+<Callout type="warn">
+AlarmKit does not expose Android-style `Intent` or `PendingIntent` launch routing. iOS presentation
+options customize AlarmKit text only — they cannot force a React Native route.
+</Callout>
+
+For route-specific behavior, put route context such as `alarmId` or a screen name in `ios.metadata`,
+then read it back on launch and navigate from JavaScript:
+
+```ts
+await ExpoAlarm.scheduleAlarmAsync({
+  hour: 7,
+  minute: 0,
+  ios: { metadata: { route: 'alarm-detail' } },
+});
+
+// Later, on launch or resume:
+const context = await ExpoAlarm.getCurrentAlarmContextAsync();
+if (context?.metadata?.route) router.replace(String(context.metadata.route));
+```
+
+Foreground listeners such as `onAlarmAction` and `onAlarmStateChange` are best effort. Always
+reconcile from the async getters after launch — see [Handoffs and actions](/guides/handoff-and-actions).
+
+## Alert presentation
+
+- `alertActionMode: 'openMissionOnly'` prefers AlarmKit's newer secondary-only alert presentation
+  when the runtime supports it. This omits the package-configured stop button and makes the secondary
+  button the visible app action.
+- `stopIntentBehavior: 'recordOnly'` installs a built-in AlarmKit App Intent that records a
+  `nativeStop` action when the system stop control is pressed.
+- `stopIntentBehavior: 'openApp'` records `nativeStop` and asks iOS to foreground the app
+  immediately. The action record includes `foregroundRequested: true`; iOS does not provide a
+  reliable success callback to the package.
+- `stopIntentBehavior: 'rescheduleImmediate'` records `nativeStop`, asks iOS to foreground the app,
+  and schedules a short backup AlarmKit timer until JS calls `completeNativeAlarmAsync(alarmId)` or
+  `resetNativeAlarmCompletionAsync(alarmId)`.
+- `secondaryButtonBehavior: 'openApp'` installs a built-in AlarmKit App Intent that records
+  `secondaryOpen` and asks iOS to open the app. Use `recordOnly` to record without foregrounding, or
+  `none` to omit the secondary intent.
+
+## The limits of completion gating
+
+AlarmKit may still expose system-owned close or stop affordances that do not invoke package App
+Intents. Treat strict completion enforcement as limited by public AlarmKit APIs, and use the debug
+state to see what the runtime actually gave you:
+
+```ts
+const state = await ExpoAlarm.getNativeAlarmDebugStateAsync(alarmId);
+```
+
+If `alertActionMode` is `openMissionOnly` but `alertInitializer` is `legacyStopButton`, the runtime
+required the legacy stop-button presentation and the package cannot remove that AlarmKit stop
+affordance. `runtimeSupportsSecondaryOnlyAlert` tells you whether the newer presentation was
+available at all.
+
+## Backup alarm ids
+
+Backup alarms use a deterministic native UUID derived from the original logical `alarmId`, so each
+re-arm cancels and replaces the previous backup instead of accumulating retry alarms. When the active
+native alarm *is* the backup timer, `getCurrentAlarmContextAsync()` still returns the original logical
+alarm id as `id`, and puts the backup UUID in `nativeAlarmId`.
+
+## Alarm ids must be UUIDs
+
+iOS AlarmKit requires `id` to be a UUID string when you provide one. Android accepts any string, so
+generate UUIDs if you want to share ids across both platforms.
