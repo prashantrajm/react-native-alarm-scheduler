@@ -143,22 +143,23 @@ The guarantee is absolute on Android and best-effort on iOS — see
 
 ## Platform support
 
-| Capability | Android | iOS | Web |
-| --- | :---: | :---: | :---: |
-| Schedule, list and cancel app-owned alarms | ✅ | ✅ | ❌ |
-| Permissions and settings surfaces | ✅ | ✅ | ❌ |
-| Custom alarm sound | ✅ | ✅ | ❌ |
-| Ring until the app says stop (`openAppOnly`) | ✅ | ⚠️ | ❌ |
-| Cold-launch handoff, action records, backup alarms | ✅ | ✅ | ❌ |
-| Survive reboot | ✅ | ✅ | ❌ |
-| Create an alarm in the system Clock app | ✅ | ❌ | ❌ |
-| Open the system alarm app | ✅ | ❌ | ❌ |
+| Capability | Android | iOS |
+| --- | :---: | :---: |
+| Schedule, list and cancel app-owned alarms | ✅ | ✅ |
+| Permissions and settings surfaces | ✅ | ✅ |
+| Custom alarm sound | ✅ | ✅ |
+| Ring until the app says stop (`openAppOnly`) | ✅ | ⚠️ |
+| Cold-launch handoff, action records, backup alarms | ✅ | ✅ |
+| Survive reboot | ✅ | ✅ |
+| Create an alarm in the system Clock app | ✅ | ❌ |
+| Open the system alarm app | ✅ | ❌ |
 
 ⚠️ Android lets the app own the ringing surface, so `openAppOnly` removes the stop control outright.
 On iOS the surface belongs to AlarmKit, which may still expose a system stop affordance the package
 cannot remove; `stopIntentBehavior: 'rescheduleImmediate'` re-arms behind it.
 
-Web is supported only as explicit unavailable/no-op behavior.
+On web, `scheduleAlarmAsync` and `setSystemAlarmAsync` throw; every other method resolves to an
+explicit unavailable or no-op result, so a universal app still compiles and runs.
 
 ## Contributing
 
