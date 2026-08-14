@@ -32,10 +32,26 @@ export type AlarmMetadataValue = string | number | boolean;
 
 export type AlarmMetadata = Record<string, AlarmMetadataValue>;
 
+/**
+ * Controls which buttons the ringing alert offers.
+ *
+ * `default` shows a stop button. `openAppOnly` removes it, leaving a single button that opens
+ * your app while the alarm keeps ringing; only `completeNativeAlarmAsync()` ends the ring.
+ *
+ * `openMissionOnly` is the former name of `openAppOnly` and is still accepted.
+ *
+ * @see https://react-native-alarm-scheduler.vercel.app/guides/completion-gating
+ */
+export type AlarmAlertActionMode =
+  | "default"
+  | "openAppOnly"
+  /** @deprecated Renamed to `openAppOnly`. Still accepted; removed in 1.0. */
+  | "openMissionOnly";
+
 export type IosAlarmOptions = {
   metadata?: AlarmMetadata;
   alertTitle?: string;
-  alertActionMode?: "default" | "openMissionOnly";
+  alertActionMode?: AlarmAlertActionMode;
   stopButtonTitle?: string;
   secondaryButtonTitle?: string;
   countdownTitle?: string;
@@ -59,10 +75,10 @@ export type AndroidAlarmOptions = {
   /** Secondary line on the ringing screen and notification. Defaults to `"Alarm"`. */
   alertBody?: string;
   /**
-   * `openMissionOnly` removes every way to silence the alarm except handing off to the app,
+   * `openAppOnly` removes every way to silence the alarm except handing off to the app,
    * which must then call `completeNativeAlarmAsync()`. `default` also shows a stop button.
    */
-  alertActionMode?: "default" | "openMissionOnly";
+  alertActionMode?: AlarmAlertActionMode;
   stopButtonTitle?: string;
   secondaryButtonTitle?: string;
   /** `rescheduleImmediate` re-arms a backup alarm whenever the user stops without completing. */
@@ -92,7 +108,7 @@ export type AndroidAlarmOptions = {
    */
   fullScreenTarget?: "native" | "app";
   /**
-   * Deep link opened when the user hands off to the app, e.g. `"myapp://mission/alarm-ring"`.
+   * Deep link opened when the user hands off to the app, e.g. `"myapp://alarm/ring"`.
    * `{alarmId}` is substituted if present, otherwise `?alarmId=` is appended.
    */
   launchUri?: string;
@@ -177,7 +193,8 @@ export type NativeAlarmDebugState = {
   pendingHandoff?: AlarmAction | null;
   intentDebugCounts?: Record<string, number>;
   currentContext: AlarmContext | null;
-  alertActionMode?: "default" | "openMissionOnly";
+  /** Always reported in canonical form, even when scheduled with the legacy `openMissionOnly`. */
+  alertActionMode?: "default" | "openAppOnly";
   stopButtonIncluded?: boolean;
   secondaryButtonIncluded?: boolean;
   secondaryButtonBehavior?: "openApp" | "recordOnly" | "none";

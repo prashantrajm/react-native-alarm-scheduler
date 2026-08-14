@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+Naming and documentation. No scheduling, ringing or completion logic changed.
+
+### ♻️ Renamed
+
+- `alertActionMode: 'openMissionOnly'` is now **`'openAppOnly'`**. The old spelling is still accepted
+  on both platforms — including for alarms already persisted by an older build, so an app update
+  cannot silently hand those alarms a stop button — and will be removed in 1.0. Whichever you pass,
+  `getNativeAlarmDebugStateAsync()` reports the canonical `openAppOnly`.
+- The default secondary-button label for that mode changed from `"Start mission"` (Android) and
+  `"Open"` (iOS) to **`"Open app"`** on both. Apps that set `secondaryButtonTitle` are unaffected.
+
+### 📝 Documentation
+
+- Reposition the README and docs around what the package is — AlarmKit on iOS and an equivalent on
+  Android — rather than around completion gating, which is now presented as one feature among many.
+- Replace the app-specific examples (`mission`, `math`, `myapp://mission/alarm-ring`) with neutral
+  ones throughout the README, docs site and agent skill.
+- Give the README's cold-launch handoff pattern its own section; it is core to using the package and
+  was previously buried inside the completion-gating example.
+
 ## 0.2.1
 
 Documentation only. No runtime, API or native behavior changes.

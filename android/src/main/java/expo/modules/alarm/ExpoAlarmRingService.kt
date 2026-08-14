@@ -123,7 +123,7 @@ class ExpoAlarmRingService : Service() {
     )
   }
 
-  /** The app finished its mission — this is the only silent, no-re-arm exit. */
+  /** The app reported completion — this is the only silent, no-re-arm exit. */
   private fun handleComplete(id: String?) {
     // A mismatch only matters while some *other* alarm is actually ringing; otherwise this is a
     // completion arriving at an idle service, which must still shut itself down.
@@ -164,7 +164,7 @@ class ExpoAlarmRingService : Service() {
     stopRinging()
   }
 
-  /** The user chose "open the app" — keep ringing until the app says the mission is done. */
+  /** The user chose "open the app" — keep ringing until the app reports completion. */
   private fun handleOpen(id: String?) {
     val currentId = id ?: alarmId ?: return
     val resolved = options ?: return
@@ -355,8 +355,8 @@ class ExpoAlarmRingService : Service() {
       if (alarmId != id) {
         return@Runnable
       }
-      // Time-boxing the ring protects the battery, but an unfinished mission must still come
-      // back when the app asked for rescheduleImmediate.
+      // Time-boxing the ring protects the battery, but an alarm the app never completed must
+      // still come back when it asked for rescheduleImmediate.
       if (options.stopIntentBehavior == STOP_BEHAVIOR_RESCHEDULE && !ExpoAlarmStore.isComplete(this, id)) {
         ExpoAlarmScheduler.scheduleBackup(this, id, TIMEOUT_BACKUP_DELAY_SECONDS)
       }

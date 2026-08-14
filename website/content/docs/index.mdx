@@ -1,17 +1,20 @@
 ---
 title: Introduction
-description: Real, user-visible alarms for React Native and Expo apps — not delayed background work.
+description: Real, user-visible alarms for React Native and Expo — AlarmKit on iOS, an equivalent on Android.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
 import { Card, Cards } from 'fumadocs-ui/components/card';
 
-Notification libraries schedule a notification and hope the device is awake to show it.
-`react-native-alarm-scheduler` schedules an actual alarm: `AlarmManager.setAlarmClock` on Android with
-a foreground service that keeps ringing through Doze and a killed app, and AlarmKit on iOS 26+.
+iOS 26 shipped AlarmKit: an alarm that rings on the lock screen, through silent mode and Focus,
+whether or not your app is running. Android ships no such framework.
 
-It also supports **completion-gated alarms** — the ring does not stop until your app says the user
-has actually woken up.
+`react-native-alarm-scheduler` gives you AlarmKit on iOS and builds the equivalent on Android out of
+`AlarmManager.setAlarmClock`, a foreground service that keeps ringing through Doze and a killed app,
+and a full-screen lock-screen ring UI — behind one typed API.
+
+Notification libraries schedule a notification and hope the device is awake to show it. This
+schedules an actual alarm.
 
 ```ts
 import ExpoAlarm from 'react-native-alarm-scheduler';
@@ -27,7 +30,7 @@ await ExpoAlarm.scheduleAlarmAsync({
 ## Features
 
 - **App-owned native alarms** on Android and iOS from one typed API.
-- **Completion gating** — with `openMissionOnly`, only `completeNativeAlarmAsync()` ends the ring.
+- **Ring until your app says stop** — with `openAppOnly`, only `completeNativeAlarmAsync()` ends it.
 - **Stays audible on Android** — loops on the alarm stream, ignoring the ringer and Do Not Disturb,
   and re-raises the volume whenever anything lowers it.
 - **Full-screen lock-screen ringing UI** backed by a foreground service, so a killed app still rings.
@@ -41,24 +44,25 @@ await ExpoAlarm.scheduleAlarmAsync({
 
 ## Platform support
 
-| Capability | Android | iOS | Web |
-| --- | :---: | :---: | :---: |
-| Schedule, list and cancel app-owned alarms | ✅ | ✅ | ❌ |
-| Permissions and settings surfaces | ✅ | ✅ | ❌ |
-| Custom alarm sound | ✅ | ✅ | ❌ |
-| Ring until the app says stop (`openMissionOnly`) | ✅ | ⚠️ | ❌ |
-| Cold-launch handoff, action records, backup alarms | ✅ | ✅ | ❌ |
-| Survive reboot | ✅ | ✅ | ❌ |
-| Create an alarm in the system Clock app | ✅ | ❌ | ❌ |
-| Open the system alarm app | ✅ | ❌ | ❌ |
+| Capability | Android | iOS |
+| --- | :---: | :---: |
+| Schedule, list and cancel app-owned alarms | ✅ | ✅ |
+| Permissions and settings surfaces | ✅ | ✅ |
+| Custom alarm sound | ✅ | ✅ |
+| Ring until the app says stop (`openAppOnly`) | ✅ | ⚠️ |
+| Cold-launch handoff, action records, backup alarms | ✅ | ✅ |
+| Survive reboot | ✅ | ✅ |
+| Create an alarm in the system Clock app | ✅ | ❌ |
+| Open the system alarm app | ✅ | ❌ |
 
 <Callout type="warn">
-On iOS the ringing surface belongs to AlarmKit, so the system may still expose a stop control the
-package cannot remove; `stopIntentBehavior: 'rescheduleImmediate'` re-arms behind it. On Android the
-package owns the ringing surface outright, so `openMissionOnly` genuinely has no exit.
+Android lets the app own the ringing surface, so `openAppOnly` removes the stop control outright. On
+iOS the surface belongs to AlarmKit, which may still expose a system stop affordance the package
+cannot remove; `stopIntentBehavior: 'rescheduleImmediate'` re-arms behind it.
 </Callout>
 
-Web is supported only as explicit unavailable/no-op behavior.
+On web, `scheduleAlarmAsync` and `setSystemAlarmAsync` throw; every other method resolves to an
+explicit unavailable or no-op result, so a universal app still compiles and runs.
 
 ## Requirements
 
@@ -72,6 +76,6 @@ Web is supported only as explicit unavailable/no-op behavior.
 <Cards>
   <Card title="Installation" href="/installation" description="Install the package and configure the Expo config plugin." />
   <Card title="Quick start" href="/quick-start" description="Schedule your first alarm in a few lines." />
-  <Card title="Completion gating" href="/guides/completion-gating" description="Build an alarm the user cannot dismiss." />
+  <Card title="Completion gating" href="/guides/completion-gating" description="Keep an alarm ringing until your app confirms it is done." />
   <Card title="API reference" href="/api" description="Every method, type and event." />
 </Cards>

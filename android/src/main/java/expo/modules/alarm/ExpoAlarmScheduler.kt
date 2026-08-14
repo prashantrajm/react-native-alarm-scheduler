@@ -88,7 +88,7 @@ internal object ExpoAlarmScheduler {
     val stored = ExpoAlarmStore.alarm(context, id)
 
     if (isBackup && ExpoAlarmStore.isComplete(context, id)) {
-      // The mission finished between arming the backup and it firing. Stay quiet.
+      // The app completed the alarm between arming the backup and it firing. Stay quiet.
       cancelBackups(context, id)
       return
     }

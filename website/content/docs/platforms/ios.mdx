@@ -42,7 +42,7 @@ reconcile from the async getters after launch — see [Handoffs and actions](/gu
 
 ## Alert presentation
 
-- `alertActionMode: 'openMissionOnly'` prefers AlarmKit's newer secondary-only alert presentation
+- `alertActionMode: 'openAppOnly'` prefers AlarmKit's newer secondary-only alert presentation
   when the runtime supports it. This omits the package-configured stop button and makes the secondary
   button the visible app action.
 - `stopIntentBehavior: 'recordOnly'` installs a built-in AlarmKit App Intent that records a
@@ -67,7 +67,7 @@ state to see what the runtime actually gave you:
 const state = await ExpoAlarm.getNativeAlarmDebugStateAsync(alarmId);
 ```
 
-If `alertActionMode` is `openMissionOnly` but `alertInitializer` is `legacyStopButton`, the runtime
+If `alertActionMode` is `openAppOnly` but `alertInitializer` is `legacyStopButton`, the runtime
 required the legacy stop-button presentation and the package cannot remove that AlarmKit stop
 affordance. `runtimeSupportsSecondaryOnlyAlert` tells you whether the newer presentation was
 available at all.

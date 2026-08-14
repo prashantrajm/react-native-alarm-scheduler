@@ -75,7 +75,7 @@ internal object ExpoAlarmNotifications {
     builder.addAction(
       action(options.secondaryButtonTitle, servicePendingIntent(context, ExpoAlarmRingService.ACTION_OPEN, alarmId, "open"))
     )
-    if (options.alertActionMode != ALERT_ACTION_MODE_OPEN_MISSION_ONLY) {
+    if (options.alertActionMode != ALERT_ACTION_MODE_OPEN_APP_ONLY) {
       builder.addAction(
         action(options.stopButtonTitle, servicePendingIntent(context, ExpoAlarmRingService.ACTION_STOP, alarmId, "stop"))
       )

@@ -23,7 +23,7 @@ type NativeAlarmDebugState = {
   pendingHandoff?: AlarmAction | null;
   intentDebugCounts?: Record<string, number>;
   currentContext: AlarmContext | null;
-  alertActionMode?: 'default' | 'openMissionOnly';
+  alertActionMode?: 'default' | 'openAppOnly';
   stopButtonIncluded?: boolean;
   secondaryButtonIncluded?: boolean;
   secondaryButtonBehavior?: 'openApp' | 'recordOnly' | 'none';
@@ -44,7 +44,7 @@ type NativeAlarmDebugState = {
 This field tells you which alert presentation the runtime actually gave you.
 
 <Callout type="warn">
-If `alertActionMode` is `openMissionOnly` but `alertInitializer` is `legacyStopButton`, the runtime
+If `alertActionMode` is `openAppOnly` but `alertInitializer` is `legacyStopButton`, the runtime
 required the legacy stop-button presentation and the package **cannot** remove that AlarmKit stop
 affordance. `runtimeSupportsSecondaryOnlyAlert` tells you whether the newer presentation was
 available at all.

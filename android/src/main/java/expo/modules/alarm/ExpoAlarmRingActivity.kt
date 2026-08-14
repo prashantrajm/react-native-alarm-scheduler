@@ -24,7 +24,7 @@ import java.util.Locale
  * The lock-screen ringing surface.
  *
  * Android — unlike AlarmKit — lets the app own this screen outright, so there is no system Stop
- * button to work around: when `alertActionMode` is `openMissionOnly` the only way out is the
+ * button to work around: when `alertActionMode` is `openAppOnly` the only way out is the
  * button that hands off to the app. The UI is built in code so the library ships no resources and
  * inherits no theme from the host app.
  */
@@ -125,13 +125,13 @@ class ExpoAlarmRingActivity : Activity() {
     }
 
     root.addView(
-      primaryButton(resolved?.secondaryButtonTitle ?: "Start mission") { openApp() },
+      primaryButton(resolved?.secondaryButtonTitle ?: "Open app") { openApp() },
       LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(56)).apply {
         topMargin = dp(48)
       }
     )
 
-    if (resolved?.alertActionMode != ALERT_ACTION_MODE_OPEN_MISSION_ONLY) {
+    if (resolved?.alertActionMode != ALERT_ACTION_MODE_OPEN_APP_ONLY) {
       root.addView(
         secondaryButton(resolved?.stopButtonTitle ?: "Stop") { stopAlarm() },
         LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(56)).apply {

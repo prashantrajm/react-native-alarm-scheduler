@@ -10,14 +10,14 @@ A normal alarm has a stop button. A completion-gated alarm does not: the only wa
 that opens your app **while the alarm keeps ringing**, and the ring stops when your app calls
 `completeNativeAlarmAsync()`.
 
-This is the mode you want for wake-up missions, medication confirmations, or anything where
-"the user pressed stop" is not proof they are actually awake.
+This is the mode you want for wake-up verification, medication confirmations, shift check-ins, or
+anything where "the user pressed stop" is not proof they did the thing.
 
 <Steps>
 
 <Step>
 
-### Schedule with `openMissionOnly`
+### Schedule with `openAppOnly`
 
 ```ts
 await ExpoAlarm.scheduleAlarmAsync({
@@ -26,19 +26,25 @@ await ExpoAlarm.scheduleAlarmAsync({
   minute: 0,
   title: 'Wake up',
   ios: {
-    metadata: { mission: 'math', difficulty: 'hard' },
-    alertActionMode: 'openMissionOnly',
-    secondaryButtonTitle: 'Start mission',
+    metadata: { routine: 'morning' },
+    alertActionMode: 'openAppOnly',
+    secondaryButtonTitle: 'Open app',
     stopIntentBehavior: 'rescheduleImmediate',
   },
   android: {
-    launchUri: 'myapp://mission/alarm-ring',
+    launchUri: 'myapp://alarm/ring',
     maxRingDurationSeconds: 0, // ring until the app completes it
   },
 });
 ```
 
 `maxRingDurationSeconds: 0` disables Android's ring timeout, so nothing but your app ends the alarm.
+
+<Callout>
+This mode was called `openMissionOnly` before 0.3. That spelling is still accepted — on both
+platforms and for alarms already persisted by an older build — and will be removed in 1.0. Whichever
+you pass, `getNativeAlarmDebugStateAsync()` reports the canonical `openAppOnly`.
+</Callout>
 
 </Step>
 
@@ -55,7 +61,7 @@ const context = handoff ? null : await ExpoAlarm.getCurrentAlarmContextAsync();
 const alarmId = handoff?.alarmId ?? context?.id;
 
 if (alarmId) {
-  router.replace(`/mission/${alarmId}`);
+  router.replace(`/alarm/${alarmId}`);
   await ExpoAlarm.clearPendingNativeAlarmHandoffAsync();
 }
 ```
@@ -77,7 +83,7 @@ pending action records for that alarm.
 
 <Callout type="warn">
 On Android this call is what silences the ringing service — it is mandatory, not advisory. With
-`alertActionMode: 'openMissionOnly'` the alarm plays until this call lands.
+`alertActionMode: 'openAppOnly'` the alarm plays until this call lands.
 </Callout>
 
 </Step>
@@ -86,11 +92,11 @@ On Android this call is what silences the ringing service — it is mandatory, n
 
 ## How strong the guarantee is per platform
 
-**Android — absolute.** The package owns the ringing surface outright. `openMissionOnly` removes the
+**Android — absolute.** The package owns the ringing surface outright. `openAppOnly` removes the
 stop button from both the ringing screen and the notification, back gestures are swallowed, and the
 notification is ongoing so it cannot be swiped away. There is no exit but your app.
 
-**iOS — best effort.** The ringing surface belongs to AlarmKit. `openMissionOnly` prefers AlarmKit's
+**iOS — best effort.** The ringing surface belongs to AlarmKit. `openAppOnly` prefers AlarmKit's
 newer secondary-only alert presentation when the runtime supports it, which omits the
 package-configured stop button. But AlarmKit may still expose system-owned close or stop affordances
 that never invoke the package's App Intents.
@@ -111,7 +117,7 @@ gave you:
 ```ts
 const state = await ExpoAlarm.getNativeAlarmDebugStateAsync(alarmId);
 
-if (state.alertActionMode === 'openMissionOnly' && state.alertInitializer === 'legacyStopButton') {
+if (state.alertActionMode === 'openAppOnly' && state.alertInitializer === 'legacyStopButton') {
   // The runtime required the legacy stop-button presentation. The package
   // cannot remove that AlarmKit stop affordance.
 }
