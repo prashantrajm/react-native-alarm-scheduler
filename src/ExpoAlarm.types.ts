@@ -45,7 +45,7 @@ export type AlarmMetadata = Record<string, AlarmMetadataValue>;
 export type AlarmAlertActionMode =
   | "default"
   | "openAppOnly"
-  /** @deprecated Renamed to `openAppOnly`. Still accepted; removed in 1.0. */
+  /** @deprecated Use `openAppOnly`. Still accepted; will be removed in a future major. */
   | "openMissionOnly";
 
 export type IosAlarmOptions = {

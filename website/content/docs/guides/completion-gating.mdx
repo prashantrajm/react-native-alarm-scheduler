@@ -41,9 +41,9 @@ await ExpoAlarm.scheduleAlarmAsync({
 `maxRingDurationSeconds: 0` disables Android's ring timeout, so nothing but your app ends the alarm.
 
 <Callout>
-This mode was called `openMissionOnly` before 0.3. That spelling is still accepted — on both
-platforms and for alarms already persisted by an older build — and will be removed in 1.0. Whichever
-you pass, `getNativeAlarmDebugStateAsync()` reports the canonical `openAppOnly`.
+This mode was previously called `openMissionOnly`. That spelling is still accepted — on both
+platforms and for alarms already persisted by an older build — and will be removed in a future
+major. Whichever you pass, `getNativeAlarmDebugStateAsync()` reports the canonical `openAppOnly`.
 </Callout>
 
 </Step>
