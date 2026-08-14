@@ -1,15 +1,17 @@
 # Changelog
 
 <!--
-  Rename this heading to the release version (e.g. `## 0.3.0`) in the same commit that bumps
+  Every release needs its own `## <version>` heading here, added in the same commit that bumps
   package.json. .github/workflows/release.yml extracts release notes with `awk -v v="## $version"`,
-  so a heading of `## Unreleased` matches nothing and the GitHub Release falls back to
-  "See CHANGELOG.md for details."
+  so a heading that does not match the version exactly (`## Unreleased`, a stray `v` prefix) makes
+  the GitHub Release fall back to "See CHANGELOG.md for details."
 -->
 
-## Unreleased
+## 0.3.0
 
 Naming and documentation. No scheduling, ringing or completion logic changed.
+
+`alertActionMode: 'openMissionOnly'` still works, so no code change is required to upgrade.
 
 ### ♻️ Renamed
 
