@@ -1,5 +1,12 @@
 # Changelog
 
+<!--
+  Rename this heading to the release version (e.g. `## 0.3.0`) in the same commit that bumps
+  package.json. .github/workflows/release.yml extracts release notes with `awk -v v="## $version"`,
+  so a heading of `## Unreleased` matches nothing and the GitHub Release falls back to
+  "See CHANGELOG.md for details."
+-->
+
 ## Unreleased
 
 Naming and documentation. No scheduling, ringing or completion logic changed.
@@ -8,8 +15,8 @@ Naming and documentation. No scheduling, ringing or completion logic changed.
 
 - `alertActionMode: 'openMissionOnly'` is now **`'openAppOnly'`**. The old spelling is still accepted
   on both platforms — including for alarms already persisted by an older build, so an app update
-  cannot silently hand those alarms a stop button — and will be removed in 1.0. Whichever you pass,
-  `getNativeAlarmDebugStateAsync()` reports the canonical `openAppOnly`.
+  cannot silently hand those alarms a stop button — and will be removed in a future major. Whichever
+  you pass, `getNativeAlarmDebugStateAsync()` reports the canonical `openAppOnly`.
 - The default secondary-button label for that mode changed from `"Start mission"` (Android) and
   `"Open"` (iOS) to **`"Open app"`** on both. Apps that set `secondaryButtonTitle` are unaffected.
 
