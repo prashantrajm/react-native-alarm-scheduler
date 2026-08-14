@@ -67,7 +67,7 @@ reschedule if the alarm repeats.
 ## Completion-gated alarms
 
 An alarm that keeps ringing until the app confirms the user finished something. `openAppOnly` was
-called `openMissionOnly` before 0.3; the old spelling is still accepted but write new code with
+previously called `openMissionOnly`; the old spelling is still accepted, but write new code with
 `openAppOnly`.
 
 ```ts
