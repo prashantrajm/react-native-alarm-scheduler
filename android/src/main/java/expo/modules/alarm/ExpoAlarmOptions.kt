@@ -5,7 +5,14 @@ import kotlin.math.max
 import kotlin.math.min
 
 internal const val ALERT_ACTION_MODE_DEFAULT = "default"
-internal const val ALERT_ACTION_MODE_OPEN_MISSION_ONLY = "openMissionOnly"
+internal const val ALERT_ACTION_MODE_OPEN_APP_ONLY = "openAppOnly"
+
+/**
+ * Former name of [ALERT_ACTION_MODE_OPEN_APP_ONLY]. Still accepted from JS, and still read back out
+ * of alarms persisted by older versions, so an app update must not quietly hand those alarms a stop
+ * button. Normalized away on the way in; never written back out.
+ */
+internal const val ALERT_ACTION_MODE_OPEN_APP_ONLY_LEGACY = "openMissionOnly"
 
 internal const val STOP_BEHAVIOR_RECORD_ONLY = "recordOnly"
 internal const val STOP_BEHAVIOR_OPEN_APP = "openApp"
@@ -22,7 +29,7 @@ internal const val FULL_SCREEN_TARGET_APP = "app"
  *
  * Fields that mean the same thing on both platforms fall back to the `ios` options block when the
  * `android` block omits them. That is what lets an app written against the iOS/AlarmKit flow —
- * `ios.metadata`, `ios.alertActionMode: 'openMissionOnly'`,
+ * `ios.metadata`, `ios.alertActionMode: 'openAppOnly'`,
  * `ios.stopIntentBehavior: 'rescheduleImmediate'` — behave the same on Android with no JS changes.
  */
 internal data class ExpoAlarmOptions(
@@ -83,7 +90,7 @@ internal data class ExpoAlarmOptions(
 
       val alertActionMode = normalizeAlertActionMode(android?.alertActionMode ?: ios?.alertActionMode)
       val secondaryButtonTitle = firstNonBlank(android?.secondaryButtonTitle, ios?.secondaryButtonTitle)
-        ?: if (alertActionMode == ALERT_ACTION_MODE_OPEN_MISSION_ONLY) "Start mission" else "Open"
+        ?: if (alertActionMode == ALERT_ACTION_MODE_OPEN_APP_ONLY) "Open app" else "Open"
 
       return ExpoAlarmOptions(
         metadata = metadata,
@@ -127,7 +134,7 @@ internal data class ExpoAlarmOptions(
         alertActionMode = alertActionMode,
         stopButtonTitle = json.optStringOrNull("stopButtonTitle") ?: "Stop",
         secondaryButtonTitle = json.optStringOrNull("secondaryButtonTitle")
-          ?: if (alertActionMode == ALERT_ACTION_MODE_OPEN_MISSION_ONLY) "Start mission" else "Open",
+          ?: if (alertActionMode == ALERT_ACTION_MODE_OPEN_APP_ONLY) "Open app" else "Open",
         stopIntentBehavior = normalizeStopIntentBehavior(json.optStringOrNull("stopIntentBehavior")),
         secondaryButtonBehavior = normalizeSecondaryButtonBehavior(json.optStringOrNull("secondaryButtonBehavior")),
         soundName = json.optStringOrNull("soundName"),
@@ -148,7 +155,8 @@ internal data class ExpoAlarmOptions(
     }
 
     private fun normalizeAlertActionMode(value: String?): String = when (value) {
-      ALERT_ACTION_MODE_OPEN_MISSION_ONLY -> ALERT_ACTION_MODE_OPEN_MISSION_ONLY
+      ALERT_ACTION_MODE_OPEN_APP_ONLY, ALERT_ACTION_MODE_OPEN_APP_ONLY_LEGACY ->
+        ALERT_ACTION_MODE_OPEN_APP_ONLY
       else -> ALERT_ACTION_MODE_DEFAULT
     }
 

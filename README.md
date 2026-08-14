@@ -4,17 +4,21 @@
 [![license](https://img.shields.io/npm/l/react-native-alarm-scheduler.svg)](https://github.com/rajmauryafr/react-native-alarm-scheduler/blob/main/LICENSE)
 ![platforms](https://img.shields.io/badge/platforms-android%20%7C%20ios-lightgrey)
 
-Real, user-visible alarms for React Native and Expo apps — not delayed background work.
+Real, user-visible alarms for React Native and Expo — AlarmKit on iOS, an equivalent on Android.
 
-Notification libraries schedule a notification and hope the device is awake to show it. This package
-schedules an actual alarm: Android `AlarmManager.setAlarmClock` with a foreground service that keeps
-ringing through Doze and a killed app, and iOS AlarmKit on iOS 26+. It also supports
-**completion-gated alarms** — the ring does not stop until your app says the user has actually woken up.
+iOS 26 shipped AlarmKit: an alarm that rings on the lock screen, through silent mode and Focus,
+whether or not your app is running. Android ships no such framework. This package gives you AlarmKit
+on iOS and builds the equivalent on Android out of `AlarmManager.setAlarmClock`, a foreground service
+that keeps ringing through Doze and a killed app, and a full-screen lock-screen ring UI — behind one
+typed API.
+
+Notification libraries schedule a notification and hope the device is awake to show it. This
+schedules an actual alarm.
 
 ## Features
 
 - ⏰ **App-owned native alarms** on Android and iOS from one typed API.
-- 🔒 **Completion gating** — with `openMissionOnly`, only `completeNativeAlarmAsync()` ends the ring.
+- 🔒 **Ring until your app says stop** — with `openAppOnly`, only `completeNativeAlarmAsync()` ends it.
 - 📢 **Stays audible on Android** — loops on the alarm stream, ignoring the ringer and Do Not Disturb, and re-raises the volume when anything lowers it.
 - 📱 **Full-screen lock-screen ringing UI** backed by a foreground service, so a killed app still rings.
 - 🔁 **Survives reboots**, app updates, and clock/timezone changes.
@@ -88,29 +92,21 @@ if (permissions.canScheduleExactAlarms) {
 }
 ```
 
-### An alarm the user cannot dismiss
-
-Set `alertActionMode: 'openMissionOnly'` and the only way out is a button that opens your app while
-the alarm keeps ringing:
+List and cancel what you scheduled:
 
 ```ts
-await ExpoAlarm.scheduleAlarmAsync({
-  id: alarmId, // must be a UUID string on iOS
-  hour: 7,
-  minute: 0,
-  title: 'Wake up',
-  ios: {
-    metadata: { mission: 'math' },
-    alertActionMode: 'openMissionOnly',
-    secondaryButtonTitle: 'Start mission',
-    stopIntentBehavior: 'rescheduleImmediate',
-  },
-  // Android inherits every shared iOS field; set android only where platforms differ.
-  android: { launchUri: 'myapp://mission/alarm-ring', maxRingDurationSeconds: 0 },
-});
+const alarms = await ExpoAlarm.getScheduledAlarmsAsync();
+
+for (const alarm of alarms) {
+  await ExpoAlarm.cancelAlarmAsync(alarm.id);
+}
 ```
 
-Route from whichever native record exists on launch and on resume:
+### Routing when an alarm opens your app
+
+Events (`onAlarmTriggered`, `onAlarmAction`, `onAlarmStateChange`) fire only when a JS runtime is
+alive — which it is not on a cold launch from the lock screen. Everything they carry is also written
+natively before any JS runs, so reconcile from the async getters on every launch and foreground:
 
 ```ts
 const handoff = await ExpoAlarm.getPendingNativeAlarmHandoffAsync();
@@ -118,21 +114,32 @@ const context = handoff ? null : await ExpoAlarm.getCurrentAlarmContextAsync();
 const alarmId = handoff?.alarmId ?? context?.id;
 
 if (alarmId) {
-  router.replace(`/mission/${alarmId}`);
+  router.replace(`/alarm/${alarmId}`);
   await ExpoAlarm.clearPendingNativeAlarmHandoffAsync();
 }
 ```
 
-Then stop the alarm only once the user actually finishes:
+See the [API reference](https://react-native-alarm-scheduler.vercel.app/api/events).
+
+### Ringing until your app says stop
+
+Set `alertActionMode: 'openAppOnly'` and the ringing alert loses its stop button — the only way out
+opens your app, and the alarm keeps ringing until you call `completeNativeAlarmAsync(alarmId)`.
+Useful when "the user pressed stop" is not proof of anything:
 
 ```ts
-await ExpoAlarm.completeNativeAlarmAsync(alarmId);
-await ExpoAlarm.cancelAlarmAsync(alarmId); // then reschedule if the alarm repeats
+await ExpoAlarm.scheduleAlarmAsync({
+  hour: 7,
+  minute: 0,
+  title: 'Wake up',
+  // Android inherits every shared iOS field; set android only where platforms differ.
+  ios: { alertActionMode: 'openAppOnly', stopIntentBehavior: 'rescheduleImmediate' },
+  android: { maxRingDurationSeconds: 0 },
+});
 ```
 
-Events (`onAlarmTriggered`, `onAlarmAction`, `onAlarmStateChange`) fire only when a JS runtime is
-alive. Everything they carry is also persisted natively, so reconcile from the async getters on every
-launch and foreground. See the [API reference](https://react-native-alarm-scheduler.vercel.app/api/events).
+The guarantee is absolute on Android and best-effort on iOS — see
+[Completion gating](https://react-native-alarm-scheduler.vercel.app/guides/completion-gating).
 
 ## Platform support
 
@@ -141,15 +148,15 @@ launch and foreground. See the [API reference](https://react-native-alarm-schedu
 | Schedule, list and cancel app-owned alarms | ✅ | ✅ | ❌ |
 | Permissions and settings surfaces | ✅ | ✅ | ❌ |
 | Custom alarm sound | ✅ | ✅ | ❌ |
-| Ring until the app says stop (`openMissionOnly`) | ✅ | ⚠️ | ❌ |
+| Ring until the app says stop (`openAppOnly`) | ✅ | ⚠️ | ❌ |
 | Cold-launch handoff, action records, backup alarms | ✅ | ✅ | ❌ |
 | Survive reboot | ✅ | ✅ | ❌ |
 | Create an alarm in the system Clock app | ✅ | ❌ | ❌ |
 | Open the system alarm app | ✅ | ❌ | ❌ |
 
-⚠️ On iOS the ringing surface belongs to AlarmKit, so the system may still expose a stop control the
-package cannot remove; `stopIntentBehavior: 'rescheduleImmediate'` re-arms behind it. On Android the
-package owns the ringing surface outright, so `openMissionOnly` genuinely has no exit.
+⚠️ Android lets the app own the ringing surface, so `openAppOnly` removes the stop control outright.
+On iOS the surface belongs to AlarmKit, which may still expose a system stop affordance the package
+cannot remove; `stopIntentBehavior: 'rescheduleImmediate'` re-arms behind it.
 
 Web is supported only as explicit unavailable/no-op behavior.
 

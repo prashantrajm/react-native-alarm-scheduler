@@ -53,13 +53,13 @@ await ExpoAlarm.scheduleAlarmAsync({
   hour: 7,
   minute: 0,
   ios: {
-    alertActionMode: 'openMissionOnly',
-    secondaryButtonTitle: 'Start mission',
-    metadata: { mission: 'math' },
+    alertActionMode: 'openAppOnly',
+    secondaryButtonTitle: 'Open app',
+    metadata: { routine: 'morning' },
   },
   // Inherits all three above. Only adds what is Android-specific.
   android: {
-    launchUri: 'myapp://mission/alarm-ring',
+    launchUri: 'myapp://alarm/ring',
     maxRingDurationSeconds: 0,
   },
 });
@@ -75,7 +75,7 @@ information:
 await ExpoAlarm.scheduleAlarmAsync({
   hour: 7,
   minute: 0,
-  ios: { metadata: { route: 'alarm-detail', mission: 'math' } },
+  ios: { metadata: { route: 'alarm-detail', routine: 'morning' } },
 });
 ```
 

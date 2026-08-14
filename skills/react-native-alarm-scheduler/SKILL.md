@@ -1,13 +1,13 @@
 ---
 name: react-native-alarm-scheduler
-description: Use when adding, debugging or reviewing native alarms in a React Native or Expo app with the react-native-alarm-scheduler package — scheduling alarms, alarm permissions, alarms that ring on a locked screen, alarms the user cannot dismiss until they complete something, AlarmKit on iOS, or AlarmManager/foreground-service ringing on Android. Also use when an alarm does not fire, does not ring, or is silenced too easily.
+description: Use when adding, debugging or reviewing native alarms in a React Native or Expo app with the react-native-alarm-scheduler package — scheduling alarms, alarm permissions, alarms that ring on a locked screen, alarms that keep ringing until the app confirms completion, AlarmKit on iOS, or AlarmManager/foreground-service ringing on Android. Also use when an alarm does not fire, does not ring, or is silenced too easily.
 ---
 
 # react-native-alarm-scheduler
 
-Schedules real, user-visible native alarms: `AlarmManager.setAlarmClock` plus a foreground ringing
-service on Android, AlarmKit on iOS 26+. This is not a notification scheduler — the alarm rings
-through Doze, a locked screen, and a killed app.
+Schedules real, user-visible native alarms: AlarmKit on iOS 26+, and the equivalent on Android built
+from `AlarmManager.setAlarmClock` plus a foreground ringing service. This is not a notification
+scheduler — the alarm rings through Doze, a locked screen, and a killed app.
 
 Full docs: <https://react-native-alarm-scheduler.vercel.app/llms.txt>
 
@@ -60,13 +60,15 @@ can share ids.
 `maxRingDurationSeconds`, volume behavior).
 
 **5. `completeNativeAlarmAsync(alarmId)` is mandatory, not advisory.** With
-`alertActionMode: 'openMissionOnly'` the Android alarm keeps playing until this call lands. Call it
+`alertActionMode: 'openAppOnly'` the Android alarm keeps playing until this call lands. Call it
 only after the user actually satisfies the completion condition, then `cancelAlarmAsync` and
 reschedule if the alarm repeats.
 
 ## Completion-gated alarms
 
-The alarm the user cannot dismiss:
+An alarm that keeps ringing until the app confirms the user finished something. `openAppOnly` was
+called `openMissionOnly` before 0.3; the old spelling is still accepted but write new code with
+`openAppOnly`.
 
 ```ts
 await ExpoAlarm.scheduleAlarmAsync({
@@ -74,8 +76,8 @@ await ExpoAlarm.scheduleAlarmAsync({
   hour: 7,
   minute: 0,
   ios: {
-    alertActionMode: 'openMissionOnly',
-    secondaryButtonTitle: 'Start mission',
+    alertActionMode: 'openAppOnly',
+    secondaryButtonTitle: 'Open app',
     stopIntentBehavior: 'rescheduleImmediate',
   },
   android: { launchUri: 'myapp://alarm', maxRingDurationSeconds: 0 },
@@ -89,7 +91,7 @@ Be honest about the guarantee, it differs per platform:
 - **iOS — best effort.** AlarmKit owns the surface and may still show a system stop control.
   `stopIntentBehavior: 'rescheduleImmediate'` re-arms a deterministic backup timer behind it. Verify
   what the runtime gave you with `getNativeAlarmDebugStateAsync(alarmId)`: if `alertActionMode` is
-  `openMissionOnly` but `alertInitializer` is `legacyStopButton`, the stop control cannot be removed.
+  `openAppOnly` but `alertInitializer` is `legacyStopButton`, the stop control cannot be removed.
 
 Never promise a user that an iOS alarm is undismissable.
 
@@ -101,7 +103,7 @@ Never promise a user that an iOS alarm is undismissable.
 | Fires but no full-screen UI on Android 14+ | `canUseFullScreenIntent`, then `openFullScreenIntentSettingsAsync()` |
 | Rings but app opens on the wrong screen | Routing lives in an event listener instead of the launch reconcile |
 | Alarm stops when the user hits volume down | `android.enforceVolume` was disabled |
-| iOS shows a stop button despite `openMissionOnly` | `getNativeAlarmDebugStateAsync().alertInitializer` — the runtime forced the legacy presentation |
+| iOS shows a stop button despite `openAppOnly` | `getNativeAlarmDebugStateAsync().alertInitializer` — the runtime forced the legacy presentation |
 | Ring stops after 5 minutes | `android.maxRingDurationSeconds` defaults to 300; set `0` |
 | Nothing works in Expo Go | Expected. Native module — use a development build |
 

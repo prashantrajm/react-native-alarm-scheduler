@@ -73,10 +73,16 @@ type ScheduledAlarm = {
 ## iOS options
 
 ```ts
+type AlarmAlertActionMode =
+  | 'default'
+  | 'openAppOnly'
+  /** @deprecated Renamed to `openAppOnly`. Still accepted; removed in 1.0. */
+  | 'openMissionOnly';
+
 type IosAlarmOptions = {
   metadata?: AlarmMetadata;
   alertTitle?: string;
-  alertActionMode?: 'default' | 'openMissionOnly';
+  alertActionMode?: AlarmAlertActionMode;
   stopButtonTitle?: string;
   secondaryButtonTitle?: string;
   countdownTitle?: string;
@@ -100,7 +106,7 @@ type AndroidAlarmOptions = {
   metadata?: AlarmMetadata;
   alertTitle?: string;
   alertBody?: string;
-  alertActionMode?: 'default' | 'openMissionOnly';
+  alertActionMode?: AlarmAlertActionMode;
   stopButtonTitle?: string;
   secondaryButtonTitle?: string;
   stopIntentBehavior?: 'recordOnly' | 'openApp' | 'rescheduleImmediate';

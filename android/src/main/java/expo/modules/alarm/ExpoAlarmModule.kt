@@ -325,7 +325,7 @@ class ExpoAlarmModule : Module() {
       "intentDebugCounts" to ExpoAlarmStore.intentDebugCounts(context, alarmId),
       "currentContext" to currentAlarmContext(),
       "alertActionMode" to options.alertActionMode,
-      "stopButtonIncluded" to (options.alertActionMode != ALERT_ACTION_MODE_OPEN_MISSION_ONLY),
+      "stopButtonIncluded" to (options.alertActionMode != ALERT_ACTION_MODE_OPEN_APP_ONLY),
       "secondaryButtonIncluded" to true,
       "secondaryButtonBehavior" to options.secondaryButtonBehavior,
       "stopIntentBehavior" to options.stopIntentBehavior,

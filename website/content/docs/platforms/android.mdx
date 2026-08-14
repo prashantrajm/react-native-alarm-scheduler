@@ -66,11 +66,11 @@ take over a locked screen.
   appears instantly even from a cold start. Use `'app'` only if your own launch activity sets
   `showWhenLocked`, otherwise it opens behind the keyguard.
 - `launchUri` is the deep link opened when the user hands off, for example
-  `'myapp://mission/alarm-ring'`. `{alarmId}` is substituted when present; otherwise `?alarmId=` is
+  `'myapp://alarm/ring'`. `{alarmId}` is substituted when present; otherwise `?alarmId=` is
   appended.
 - `maxRingDurationSeconds` (default `300`) time-boxes the ring for battery's sake. Set `0` to ring
   until the app completes the alarm.
-- `alertActionMode: 'openMissionOnly'` removes the stop button from both the ringing screen and the
+- `alertActionMode: 'openAppOnly'` removes the stop button from both the ringing screen and the
   notification. Back gestures are swallowed and the notification is ongoing, so it cannot be swiped
   away.
 - `stopIntentBehavior: 'rescheduleImmediate'` arms a backup alarm whenever the user stops without

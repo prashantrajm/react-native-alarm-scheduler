@@ -927,7 +927,7 @@ public class ExpoAlarmModule: Module {
     let stopButtonTitle = options?.stopButtonTitle?.isEmpty == false ? options!.stopButtonTitle! : "Stop"
     let secondaryButtonTitle = options?.secondaryButtonTitle?.isEmpty == false
       ? options!.secondaryButtonTitle!
-      : (alertActionMode == "openMissionOnly" ? "Open" : nil)
+      : (alertActionMode == "openAppOnly" ? "Open app" : nil)
     let countdownTitle = options?.countdownTitle?.isEmpty == false ? options!.countdownTitle! : nil
     let secondaryButtonBehavior = normalizeSecondaryButtonBehavior(options?.secondaryButtonBehavior, hasSecondaryButton: secondaryButtonTitle != nil)
     let secondaryButton = secondaryButtonTitle.map {
@@ -997,7 +997,7 @@ public class ExpoAlarmModule: Module {
     } else {
       runtimeSupportsSecondaryOnlyAlert = false
     }
-    let shouldUseSecondaryOnly = alertActionMode == "openMissionOnly" && runtimeSupportsSecondaryOnlyAlert
+    let shouldUseSecondaryOnly = alertActionMode == "openAppOnly" && runtimeSupportsSecondaryOnlyAlert
     let debugState: [String: Any] = [
       "alertActionMode": alertActionMode,
       "stopButtonIncluded": !shouldUseSecondaryOnly,
@@ -1007,7 +1007,7 @@ public class ExpoAlarmModule: Module {
       "alertInitializer": shouldUseSecondaryOnly ? "secondaryOnly" : "legacyStopButton",
       "runtimeSupportsSecondaryOnlyAlert": runtimeSupportsSecondaryOnlyAlert
     ]
-    if alertActionMode == "openMissionOnly" {
+    if alertActionMode == "openAppOnly" {
       if #available(iOS 26.1, *) {
         return ExpoAlarmAlertPresentationResult(
           alert: AlarmPresentation.Alert(
@@ -1030,11 +1030,13 @@ public class ExpoAlarmModule: Module {
     )
   }
 
+  /// Normalizes to the canonical mode. `openMissionOnly` is the former name of `openAppOnly` and is
+  /// still accepted, so an app that has not migrated does not quietly regain a stop button.
   @available(iOS 26.0, *)
   private func normalizeAlertActionMode(_ mode: String?) -> String {
     switch mode ?? "default" {
-    case "openMissionOnly":
-      return "openMissionOnly"
+    case "openAppOnly", "openMissionOnly":
+      return "openAppOnly"
     default:
       return "default"
     }
