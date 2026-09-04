@@ -9,8 +9,9 @@
 
 ## 1.0.0
 
-This major release gives the package a platform-neutral module identity and lets users choose alarm
-audio at runtime. Existing build-time bundled sounds and the system default remain supported.
+This major release gives the package a platform-neutral module identity, adds atomic deferred and
+follow-up alarm occurrences, and lets users choose alarm audio at runtime. Existing build-time
+bundled sounds and the system default remain supported.
 
 ### 🛠 Breaking changes
 
@@ -36,14 +37,35 @@ audio at runtime. Existing build-time bundled sounds and the system default rema
   there.
 - Expose the resolved runtime `soundUri` and any custom-sound fallback reason through
   `getNativeAlarmDebugStateAsync()`.
+- Add persistent occurrence records that separate a durable alarm definition from each native
+  delivery. Records expose an occurrence id, parent occurrence id, scheduled time, application
+  metadata, lifecycle phase, and `primary`, `deferred`, or `followUp` relationship.
+- Add `resolveAlarmOccurrenceAsync()` to stop and resolve an active occurrence, preserve one-shot
+  alarm definitions, cancel stale recovery timers, and optionally schedule a deferred or follow-up
+  occurrence as one native operation on Android and iOS.
+- Make occurrence resolution idempotent when an `idempotencyKey` is supplied, preventing repeated UI
+  actions or retries from creating duplicate deliveries.
+- Add `getAlarmOccurrencesAsync()` for querying occurrence history and
+  `cancelAlarmOccurrenceAsync()` for cancelling one scheduled occurrence without deleting its alarm
+  definition or sibling occurrences.
+- Include occurrence identity and relationship in native alarm context and events when known, and
+  restore scheduled deferred and follow-up occurrences after Android reboot, app update, or time
+  changes.
+
+### 🐛 Bug fixes
+
+- Schedule primary iOS alarms with an alert-only AlarmKit presentation. Countdown presentation is
+  now reserved for deferred and follow-up timer occurrences, preventing AlarmKit from rejecting a
+  primary alarm that has no countdown duration.
 
 ### 💡 Others
 
 - Keep `soundName` and config-plugin bundled sounds available for alarms whose audio is known at
   build time.
-- Add an audio document picker to the example app for testing runtime custom sounds.
-- Update the README, documentation site and packaged agent skill for the new module name and sound
-  workflow.
+- Split the iOS implementation into focused source files for actions, AlarmKit integration,
+  scheduling, storage, and occurrence lifecycle behavior.
+- Update the README, documentation site and packaged agent skill for the new module name, runtime
+  sound workflow, and occurrence APIs.
 
 ## 0.3.0
 
