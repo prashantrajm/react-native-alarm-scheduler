@@ -217,7 +217,7 @@ export type AlarmOccurrenceResolution = {
     relationship: "deferred" | "followUp";
     metadata?: AlarmMetadata;
   };
-  /** Makes retries return the first result instead of scheduling another occurrence. */
+  /** Makes retries for this occurrence return the first result instead of scheduling another occurrence. */
   idempotencyKey?: string;
 };
 

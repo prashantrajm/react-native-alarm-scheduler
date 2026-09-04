@@ -38,15 +38,15 @@ internal object AlarmSchedulerOccurrenceStore {
   fun alarmId(context: Context, occurrenceId: String): String =
     occurrence(context, occurrenceId)?.optString("alarmId")?.takeIf(String::isNotBlank) ?: occurrenceId
 
-  fun resolution(context: Context, alarmId: String, idempotencyKey: String): JSONObject? {
-    val raw = prefs(context).getString(resolutionKey(alarmId, idempotencyKey), null) ?: return null
+  fun resolution(context: Context, occurrenceId: String, idempotencyKey: String): JSONObject? {
+    val raw = prefs(context).getString(resolutionKey(occurrenceId, idempotencyKey), null) ?: return null
     return runCatching { JSONObject(raw) }.getOrNull()
   }
 
-  fun saveResolution(context: Context, alarmId: String, idempotencyKey: String, result: JSONObject) {
-    prefs(context).edit().putString(resolutionKey(alarmId, idempotencyKey), result.toString()).apply()
+  fun saveResolution(context: Context, occurrenceId: String, idempotencyKey: String, result: JSONObject) {
+    prefs(context).edit().putString(resolutionKey(occurrenceId, idempotencyKey), result.toString()).apply()
   }
 
-  private fun resolutionKey(alarmId: String, idempotencyKey: String) =
-    RESOLUTION_PREFIX + alarmId + ":" + idempotencyKey
+  private fun resolutionKey(occurrenceId: String, idempotencyKey: String) =
+    AlarmSchedulerOccurrencePolicy.resolutionStorageKey(occurrenceId, idempotencyKey)
 }

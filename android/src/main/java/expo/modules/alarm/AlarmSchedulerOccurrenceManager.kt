@@ -33,7 +33,7 @@ internal object AlarmSchedulerOccurrenceManager {
 
     val alarmId = AlarmSchedulerOccurrenceStore.alarmId(context, occurrenceId)
     resolution.idempotencyKey?.takeIf(String::isNotBlank)?.let { key ->
-      AlarmSchedulerOccurrenceStore.resolution(context, alarmId, key)?.let {
+      AlarmSchedulerOccurrenceStore.resolution(context, occurrenceId, key)?.let {
         return AlarmSchedulerJson.toMap(it)
       }
     }
@@ -45,6 +45,13 @@ internal object AlarmSchedulerOccurrenceManager {
     AlarmSchedulerRingService.complete(context, alarmId)
     AlarmSchedulerStore.clearActionsForAlarm(context, alarmId)
     AlarmSchedulerOccurrenceStore.updatePhase(context, occurrenceId, "completed")
+    AlarmSchedulerOccurrenceStore.all(context, alarmId)
+      .filter {
+        it.optString("occurrenceId") != occurrenceId &&
+          it.optString("relationship") != "primary" &&
+          (it.optString("phase") == "scheduled" || it.optString("phase") == "ringing")
+      }
+      .forEach { AlarmSchedulerOccurrenceStore.updatePhase(context, it.optString("occurrenceId"), "cancelled") }
 
     var nextOccurrence: JSONObject? = null
     var status = "resolved"
@@ -91,7 +98,7 @@ internal object AlarmSchedulerOccurrenceManager {
       .put("status", status)
     nextOccurrence?.let { result.put("nextOccurrence", it) }
     resolution.idempotencyKey?.takeIf(String::isNotBlank)?.let { key ->
-      AlarmSchedulerOccurrenceStore.saveResolution(context, alarmId, key, result)
+      AlarmSchedulerOccurrenceStore.saveResolution(context, occurrenceId, key, result)
     }
     return AlarmSchedulerJson.toMap(result)
   }
@@ -102,6 +109,9 @@ internal object AlarmSchedulerOccurrenceManager {
       return false
     }
     val alarmId = occurrence.optString("alarmId")
+    if (occurrence.optString("phase") == "ringing") {
+      AlarmSchedulerRingService.complete(context, alarmId)
+    }
     AlarmSchedulerScheduler.cancelRelatedOccurrence(context, alarmId, occurrenceId)
     AlarmSchedulerOccurrenceStore.updatePhase(context, occurrenceId, "cancelled")
     val hasAnotherActiveOccurrence = AlarmSchedulerOccurrenceStore.all(context, alarmId).any {

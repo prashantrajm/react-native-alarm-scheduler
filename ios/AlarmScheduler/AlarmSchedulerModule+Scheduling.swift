@@ -205,9 +205,22 @@ extension AlarmSchedulerModule {
           let primaryId = occurrence["alarmId"] as? String,
           let storedAlarm = storedById[primaryId],
           var context = alarmContext(from: storedAlarm, state: mapAlarmState(alarm.state), nativeAlarmId: id) {
-          context["occurrenceId"] = id
-          context["relationship"] = occurrence["relationship"] ?? "primary"
-          if let metadata = occurrence["metadata"] {
+          let state = mapAlarmState(alarm.state)
+          let resolvedOccurrence: [String: Any]
+          if state == "alerting",
+            occurrence["relationship"] as? String == "primary",
+            occurrence["occurrenceId"] as? String == primaryId {
+            AlarmSchedulerOccurrenceStore.updatePhase(occurrenceId: id, phase: "cancelled")
+            resolvedOccurrence = activePrimaryOccurrence(
+              alarmId: primaryId,
+              metadata: storedAlarm["metadata"] as? [String: Any] ?? [:]
+            )
+          } else {
+            resolvedOccurrence = occurrence
+          }
+          context["occurrenceId"] = resolvedOccurrence["occurrenceId"]
+          context["relationship"] = resolvedOccurrence["relationship"] ?? "primary"
+          if let metadata = resolvedOccurrence["metadata"] {
             context["metadata"] = metadata
           }
           return context
@@ -222,7 +235,25 @@ extension AlarmSchedulerModule {
             "state": mapAlarmState(alarm.state)
           ]
         }
-        return alarmContext(from: storedAlarm, state: mapAlarmState(alarm.state), nativeAlarmId: id)
+        let state = mapAlarmState(alarm.state)
+        let occurrence = state == "alerting"
+          ? activePrimaryOccurrence(
+            alarmId: id,
+            metadata: storedAlarm["metadata"] as? [String: Any] ?? [:]
+          )
+          : AlarmSchedulerOccurrenceStore.all(alarmId: id).first(where: {
+            ($0["relationship"] as? String) == "primary" &&
+              (($0["phase"] as? String) == "scheduled" || ($0["phase"] as? String) == "ringing")
+          })
+        guard var context = alarmContext(from: storedAlarm, state: state, nativeAlarmId: id) else {
+          return nil
+        }
+        if let occurrence {
+          context["occurrenceId"] = occurrence["occurrenceId"]
+          context["relationship"] = "primary"
+          context["metadata"] = occurrence["metadata"] ?? storedAlarm["metadata"]
+        }
+        return context
       }
 
       if let alertingContext = activeContexts.first(where: { ($0["state"] as? String) == "alerting" }) {
@@ -430,12 +461,16 @@ extension AlarmSchedulerModule {
   }
 
   @available(iOS 26.0, *)
-  func makeSecondaryIntent(id: String, behavior: String?) -> (any LiveActivityIntent)? {
+  func makeSecondaryIntent(
+    id: String,
+    behavior: String?,
+    occurrenceId: String? = nil
+  ) -> (any LiveActivityIntent)? {
     switch behavior ?? "openApp" {
     case "openApp":
-      return AlarmSchedulerSecondaryOpenIntent(alarmId: id)
+      return AlarmSchedulerSecondaryOpenIntent(alarmId: id, occurrenceId: occurrenceId)
     case "recordOnly":
-      return AlarmSchedulerSecondaryRecordIntent(alarmId: id)
+      return AlarmSchedulerSecondaryRecordIntent(alarmId: id, occurrenceId: occurrenceId)
     default:
       return nil
     }

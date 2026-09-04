@@ -33,18 +33,51 @@ enum AlarmSchedulerOccurrenceStore {
     save(occurrence)
   }
 
+  static func markRinging(occurrenceId: String) -> [String: Any]? {
+    guard var occurrence = occurrence(id: occurrenceId) else {
+      return nil
+    }
+    occurrence["phase"] = "ringing"
+    save(occurrence)
+    return occurrence
+  }
+
   static func alarmId(for occurrenceId: String) -> String {
     occurrence(id: occurrenceId)?["alarmId"] as? String ?? occurrenceId
   }
 
-  static func resolution(alarmId: String, idempotencyKey: String) -> [String: Any]? {
-    storedResolutions()[resolutionKey(alarmId: alarmId, idempotencyKey: idempotencyKey)]
+  static func resolution(occurrenceId: String, idempotencyKey: String) -> [String: Any]? {
+    storedResolutions()[resolutionKey(occurrenceId: occurrenceId, idempotencyKey: idempotencyKey)]
   }
 
-  static func saveResolution(alarmId: String, idempotencyKey: String, result: [String: Any]) {
+  static func saveResolution(occurrenceId: String, idempotencyKey: String, result: [String: Any]) {
     var resolutions = storedResolutions()
-    resolutions[resolutionKey(alarmId: alarmId, idempotencyKey: idempotencyKey)] = result
+    resolutions[resolutionKey(occurrenceId: occurrenceId, idempotencyKey: idempotencyKey)] = result
     UserDefaults.standard.set(resolutions, forKey: resolutionsKey)
+  }
+
+  static func activatePrimaryOccurrence(alarmId: String, metadata: [String: Any] = [:]) -> [String: Any] {
+    if var occurrence = all(alarmId: alarmId).first(where: {
+      ($0["relationship"] as? String) == "primary" &&
+        (($0["phase"] as? String) == "scheduled" || ($0["phase"] as? String) == "ringing")
+    }) {
+      occurrence["phase"] = "ringing"
+      save(occurrence)
+      return occurrence
+    }
+    let definitionMetadata = metadata.isEmpty
+      ? (all(alarmId: alarmId).first(where: { ($0["relationship"] as? String) == "primary" })?["metadata"] as? [String: Any] ?? [:])
+      : metadata
+    let occurrence: [String: Any] = [
+      "occurrenceId": AlarmSchedulerOccurrencePolicy.newPrimaryOccurrenceId(),
+      "alarmId": alarmId,
+      "scheduledFor": Int64(Date().timeIntervalSince1970 * 1000),
+      "relationship": "primary",
+      "phase": "ringing",
+      "metadata": definitionMetadata
+    ]
+    save(occurrence)
+    return occurrence
   }
 
   private static func storedOccurrences() -> [String: [String: Any]] {
@@ -55,8 +88,11 @@ enum AlarmSchedulerOccurrenceStore {
     UserDefaults.standard.dictionary(forKey: resolutionsKey) as? [String: [String: Any]] ?? [:]
   }
 
-  private static func resolutionKey(alarmId: String, idempotencyKey: String) -> String {
-    "\(alarmId):\(idempotencyKey)"
+  private static func resolutionKey(occurrenceId: String, idempotencyKey: String) -> String {
+    AlarmSchedulerOccurrencePolicy.resolutionStorageKey(
+      occurrenceId: occurrenceId,
+      idempotencyKey: idempotencyKey
+    )
   }
 
   private static func scheduledFor(_ occurrence: [String: Any]) -> Int64 {

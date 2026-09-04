@@ -18,6 +18,7 @@ internal object AlarmSchedulerScheduler {
   const val EXTRA_ID = "expo.modules.alarm.extra.ID"
   const val EXTRA_IS_BACKUP = "expo.modules.alarm.extra.IS_BACKUP"
   const val EXTRA_BACKUP_ID = "expo.modules.alarm.extra.BACKUP_ID"
+  const val EXTRA_PRIMARY_OCCURRENCE_ID = "expo.modules.alarm.extra.PRIMARY_OCCURRENCE_ID"
 
   private const val BACKUP_SUFFIX = "#backup"
 
@@ -47,6 +48,7 @@ internal object AlarmSchedulerScheduler {
       .filter { it.optString("phase") == "scheduled" || it.optString("phase") == "ringing" }
       .forEach { AlarmSchedulerOccurrenceStore.updatePhase(context, it.optString("occurrenceId"), "cancelled") }
 
+    val primaryOccurrenceId = AlarmSchedulerOccurrencePolicy.newPrimaryOccurrenceId()
     val stored = JSONObject()
       .put("id", id)
       .put("hour", hour)
@@ -57,19 +59,20 @@ internal object AlarmSchedulerScheduler {
       .put("platform", "android")
       .put("metadata", options.metadata)
       .put("options", options.toJson())
+      .put("primaryOccurrenceId", primaryOccurrenceId)
 
     AlarmSchedulerStore.saveAlarm(context, stored)
     AlarmSchedulerOccurrenceStore.save(
       context,
       JSONObject()
-        .put("occurrenceId", id)
+        .put("occurrenceId", primaryOccurrenceId)
         .put("alarmId", id)
         .put("scheduledFor", triggerAtMillis)
         .put("relationship", "primary")
         .put("phase", "scheduled")
         .put("metadata", options.metadata)
     )
-    armExact(context, id, triggerAtMillis, isBackup = false, backupId = null)
+    armExact(context, id, triggerAtMillis, isBackup = false, backupId = null, primaryOccurrenceId = primaryOccurrenceId)
     AlarmSchedulerEventBus.emitStateChange(id, "scheduled", options.metadata)
     return serialize(stored)
   }
@@ -122,7 +125,6 @@ internal object AlarmSchedulerScheduler {
   fun handleTriggered(context: Context, intent: Intent) {
     val id = intent.getStringExtra(EXTRA_ID) ?: return
     val isBackup = intent.getBooleanExtra(EXTRA_IS_BACKUP, false)
-    val occurrenceId = intent.getStringExtra(EXTRA_BACKUP_ID) ?: id
     val stored = AlarmSchedulerStore.alarm(context, id)
 
     if (isBackup && AlarmSchedulerStore.isComplete(context, id)) {
@@ -136,11 +138,20 @@ internal object AlarmSchedulerScheduler {
       return
     }
 
+    val occurrenceId = if (isBackup) {
+      intent.getStringExtra(EXTRA_BACKUP_ID) ?: return
+    } else {
+      primaryOccurrenceForDelivery(context, stored, intent)
+    }
+    val triggered = serialize(stored).toMutableMap()
+
     if (!isBackup) {
       AlarmSchedulerStore.resetCompletion(context, id)
+      AlarmSchedulerOccurrenceStore.updatePhase(context, occurrenceId, "ringing")
       rescheduleRepeatIfNeeded(context, stored)
+    } else {
+      AlarmSchedulerOccurrenceStore.updatePhase(context, occurrenceId, "ringing")
     }
-    AlarmSchedulerOccurrenceStore.updatePhase(context, occurrenceId, "ringing")
 
     val options = AlarmSchedulerOptions.fromJson(
       stored.optJSONObject("options"),
@@ -154,9 +165,14 @@ internal object AlarmSchedulerScheduler {
       context = context,
       alarmId = id,
       action = "secondaryOpen",
-      details = mapOf("foregroundRequested" to true, "trigger" to true)
+      details = mapOf(
+        "foregroundRequested" to true,
+        "trigger" to true,
+        "occurrenceId" to occurrenceId,
+        "relationship" to (AlarmSchedulerOccurrenceStore.occurrence(context, occurrenceId)
+          ?.optString("relationship", "primary") ?: "primary")
+      )
     )
-    val triggered = serialize(stored).toMutableMap()
     AlarmSchedulerOccurrenceStore.occurrence(context, occurrenceId)?.let { occurrence ->
       triggered["occurrenceId"] = occurrenceId
       triggered["relationship"] = occurrence.optString("relationship", "primary")
@@ -218,8 +234,22 @@ internal object AlarmSchedulerScheduler {
         }
       }
       stored.put("timestamp", triggerAtMillis)
+      val existingPrimaryOccurrenceId = stored.optString("primaryOccurrenceId")
+      val existingPrimaryOccurrence = AlarmSchedulerOccurrenceStore.occurrence(context, existingPrimaryOccurrenceId)
+      val primaryOccurrenceId = existingPrimaryOccurrenceId.takeIf {
+        timestamp == triggerAtMillis &&
+          existingPrimaryOccurrence?.optString("phase") == "scheduled"
+      } ?: AlarmSchedulerOccurrencePolicy.newPrimaryOccurrenceId()
+      if (primaryOccurrenceId != existingPrimaryOccurrenceId &&
+        existingPrimaryOccurrence?.optString("phase") == "scheduled") {
+        AlarmSchedulerOccurrenceStore.updatePhase(context, existingPrimaryOccurrenceId, "cancelled")
+      }
+      stored.put("primaryOccurrenceId", primaryOccurrenceId)
       AlarmSchedulerStore.saveAlarm(context, stored)
-      armExact(context, id, triggerAtMillis, isBackup = false, backupId = null)
+      if (AlarmSchedulerOccurrenceStore.occurrence(context, primaryOccurrenceId) == null) {
+        savePrimaryOccurrence(context, stored, primaryOccurrenceId, triggerAtMillis)
+      }
+      armExact(context, id, triggerAtMillis, isBackup = false, backupId = null, primaryOccurrenceId = primaryOccurrenceId)
     }
   }
 
@@ -230,9 +260,50 @@ internal object AlarmSchedulerScheduler {
       return
     }
     val next = nextTriggerAtMillis(stored.optInt("hour"), stored.optInt("minute"), weekdays)
+    val nextOccurrenceId = AlarmSchedulerOccurrencePolicy.newPrimaryOccurrenceId()
     stored.put("timestamp", next)
+    stored.put("primaryOccurrenceId", nextOccurrenceId)
     AlarmSchedulerStore.saveAlarm(context, stored)
-    armExact(context, id, next, isBackup = false, backupId = null)
+    savePrimaryOccurrence(context, stored, nextOccurrenceId, next)
+    if (!armExact(context, id, next, isBackup = false, backupId = null, primaryOccurrenceId = nextOccurrenceId)) {
+      AlarmSchedulerOccurrenceStore.updatePhase(context, nextOccurrenceId, "cancelled")
+    }
+  }
+
+  private fun primaryOccurrenceForDelivery(context: Context, stored: JSONObject, intent: Intent): String {
+    val occurrenceId = intent.getStringExtra(EXTRA_PRIMARY_OCCURRENCE_ID)
+      ?.takeIf(String::isNotBlank)
+      ?: stored.optString("primaryOccurrenceId").takeIf(String::isNotBlank)
+      ?: AlarmSchedulerOccurrencePolicy.newPrimaryOccurrenceId()
+    if (AlarmSchedulerOccurrenceStore.occurrence(context, occurrenceId) == null) {
+      AlarmSchedulerOccurrenceStore.all(context, stored.optString("id"))
+        .filter {
+          it.optString("occurrenceId") != occurrenceId &&
+            it.optString("relationship") == "primary" &&
+            (it.optString("phase") == "scheduled" || it.optString("phase") == "ringing")
+        }
+        .forEach { AlarmSchedulerOccurrenceStore.updatePhase(context, it.optString("occurrenceId"), "cancelled") }
+      savePrimaryOccurrence(context, stored, occurrenceId, stored.optLong("timestamp", System.currentTimeMillis()))
+    }
+    return occurrenceId
+  }
+
+  private fun savePrimaryOccurrence(
+    context: Context,
+    stored: JSONObject,
+    occurrenceId: String,
+    scheduledFor: Long
+  ) {
+    AlarmSchedulerOccurrenceStore.save(
+      context,
+      JSONObject()
+        .put("occurrenceId", occurrenceId)
+        .put("alarmId", stored.optString("id"))
+        .put("scheduledFor", scheduledFor)
+        .put("relationship", "primary")
+        .put("phase", "scheduled")
+        .put("metadata", JSONObject(stored.optJSONObject("metadata")?.toString() ?: "{}"))
+    )
   }
 
   // region backups
@@ -302,18 +373,23 @@ internal object AlarmSchedulerScheduler {
   }
 
   fun cancelRelatedOccurrence(context: Context, alarmId: String, occurrenceId: String) {
-    val isPrimary = occurrenceId == alarmId
+    val isPrimary = AlarmSchedulerOccurrenceStore.occurrence(context, occurrenceId)
+      ?.optString("relationship") == "primary"
     disarm(
       context,
-      requestCode(occurrenceId),
+      requestCode(if (isPrimary) alarmId else occurrenceId),
       triggerIntent(
         context,
         alarmId,
         isBackup = !isPrimary,
-        backupId = occurrenceId.takeUnless { isPrimary }
+        backupId = occurrenceId.takeUnless { isPrimary },
+        primaryOccurrenceId = occurrenceId.takeIf { isPrimary }
       )
     )
     AlarmSchedulerStore.removeRetryAlarmId(context, occurrenceId, alarmId)
+    if (isPrimary) {
+      AlarmSchedulerStore.alarm(context, alarmId)?.let { rescheduleRepeatIfNeeded(context, it) }
+    }
   }
 
   // endregion
@@ -325,14 +401,15 @@ internal object AlarmSchedulerScheduler {
     alarmId: String,
     triggerAtMillis: Long,
     isBackup: Boolean,
-    backupId: String?
+    backupId: String?,
+    primaryOccurrenceId: String? = null
   ): Boolean {
     val alarmManager = context.getSystemService(AlarmManager::class.java) ?: return false
     val code = requestCode(backupId ?: alarmId)
     val operation = PendingIntent.getBroadcast(
       context,
       code,
-      triggerIntent(context, alarmId, isBackup, backupId),
+      triggerIntent(context, alarmId, isBackup, backupId, primaryOccurrenceId),
       pendingFlags()
     )
     val showOperation = PendingIntent.getActivity(
@@ -369,7 +446,13 @@ internal object AlarmSchedulerScheduler {
     operation.cancel()
   }
 
-  private fun triggerIntent(context: Context, alarmId: String, isBackup: Boolean, backupId: String?): Intent {
+  private fun triggerIntent(
+    context: Context,
+    alarmId: String,
+    isBackup: Boolean,
+    backupId: String?,
+    primaryOccurrenceId: String? = null
+  ): Intent {
     return Intent(context, AlarmSchedulerReceiver::class.java).apply {
       action = ACTION_TRIGGERED
       // PendingIntent.filterEquals() ignores extras, so the discriminating id goes in the data URI
@@ -379,6 +462,9 @@ internal object AlarmSchedulerScheduler {
       putExtra(EXTRA_IS_BACKUP, isBackup)
       if (backupId != null) {
         putExtra(EXTRA_BACKUP_ID, backupId)
+      }
+      if (primaryOccurrenceId != null) {
+        putExtra(EXTRA_PRIMARY_OCCURRENCE_ID, primaryOccurrenceId)
       }
     }
   }

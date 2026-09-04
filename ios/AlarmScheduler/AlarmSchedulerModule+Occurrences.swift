@@ -51,7 +51,7 @@ extension AlarmSchedulerModule {
 
     let alarmId = AlarmSchedulerOccurrenceStore.alarmId(for: occurrenceId)
     if let key = resolution.idempotencyKey?.nilIfEmpty,
-      let previous = AlarmSchedulerOccurrenceStore.resolution(alarmId: alarmId, idempotencyKey: key) {
+      let previous = AlarmSchedulerOccurrenceStore.resolution(occurrenceId: occurrenceId, idempotencyKey: key) {
       return previous
     }
     guard let stored = storedAlarms().first(where: { ($0["id"] as? String) == alarmId }) else {
@@ -59,9 +59,20 @@ extension AlarmSchedulerModule {
     }
 
     AlarmSchedulerNativeAlarmStore.complete(alarmId: alarmId)
-    await cancelNativeAndRetryAlarms(originalAlarmId: alarmId)
+    await stopResolvedOccurrence(occurrenceId: occurrenceId, alarmId: alarmId)
     AlarmSchedulerNativeAlarmStore.clearActions(alarmId: alarmId)
     AlarmSchedulerOccurrenceStore.updatePhase(occurrenceId: occurrenceId, phase: "completed")
+    AlarmSchedulerOccurrenceStore.all(alarmId: alarmId)
+      .filter {
+        ($0["occurrenceId"] as? String) != occurrenceId &&
+          ($0["relationship"] as? String) != "primary" &&
+          (($0["phase"] as? String) == "scheduled" || ($0["phase"] as? String) == "ringing")
+      }
+      .forEach { occurrence in
+        if let siblingId = occurrence["occurrenceId"] as? String {
+          AlarmSchedulerOccurrenceStore.updatePhase(occurrenceId: siblingId, phase: "cancelled")
+        }
+      }
 
     var nextOccurrence: [String: Any]?
     var status = "resolved"
@@ -103,9 +114,36 @@ extension AlarmSchedulerModule {
       result["nextOccurrence"] = nextOccurrence
     }
     if let key = resolution.idempotencyKey?.nilIfEmpty {
-      AlarmSchedulerOccurrenceStore.saveResolution(alarmId: alarmId, idempotencyKey: key, result: result)
+      AlarmSchedulerOccurrenceStore.saveResolution(occurrenceId: occurrenceId, idempotencyKey: key, result: result)
     }
     return result
+  }
+
+  private func stopResolvedOccurrence(occurrenceId: String, alarmId: String) async {
+    #if canImport(AlarmKit)
+    if #available(iOS 26.0, *) {
+      let relationship = AlarmSchedulerOccurrenceStore.occurrence(id: occurrenceId)?["relationship"] as? String
+      if AlarmSchedulerOccurrencePolicy.preservesPrimarySchedule(relationship: relationship) {
+        if let nativeId = UUID(uuidString: alarmId),
+          let alarm = (try? AlarmManager.shared.alarms)?.first(where: { $0.id == nativeId }),
+          mapAlarmState(alarm.state) == "alerting" {
+          try? AlarmManager.shared.stop(id: nativeId)
+        }
+      } else if let nativeId = UUID(uuidString: occurrenceId) {
+        try? AlarmManager.shared.cancel(id: nativeId)
+      }
+      if let backupId = AlarmSchedulerRescheduler.backupAlarmId(for: alarmId) {
+        try? AlarmManager.shared.cancel(id: backupId)
+      }
+      for retryAlarmId in AlarmSchedulerNativeAlarmStore.retryAlarmIds(for: alarmId) {
+        guard let uuid = UUID(uuidString: retryAlarmId) else {
+          continue
+        }
+        try? AlarmManager.shared.cancel(id: uuid)
+      }
+      AlarmSchedulerNativeAlarmStore.clearRetryAlarmIds(for: alarmId)
+    }
+    #endif
   }
 
   func cancelAlarmOccurrence(occurrenceId: String) async -> Bool {
@@ -117,9 +155,18 @@ extension AlarmSchedulerModule {
     }
 
     #if canImport(AlarmKit)
-    if #available(iOS 26.0, *), let nativeId = UUID(uuidString: occurrenceId) {
-      try? AlarmManager.shared.cancel(id: nativeId)
-      AlarmSchedulerNativeAlarmStore.removeRetryAlarmId(occurrenceId, for: alarmId)
+    if #available(iOS 26.0, *) {
+      let relationship = occurrence["relationship"] as? String
+      if AlarmSchedulerOccurrencePolicy.preservesPrimarySchedule(relationship: relationship) {
+        if let nativeId = UUID(uuidString: alarmId),
+          let alarm = (try? AlarmManager.shared.alarms)?.first(where: { $0.id == nativeId }),
+          mapAlarmState(alarm.state) == "alerting" {
+          try? AlarmManager.shared.stop(id: nativeId)
+        }
+      } else if let nativeId = UUID(uuidString: occurrenceId) {
+        try? AlarmManager.shared.cancel(id: nativeId)
+        AlarmSchedulerNativeAlarmStore.removeRetryAlarmId(occurrenceId, for: alarmId)
+      }
       AlarmSchedulerOccurrenceStore.updatePhase(occurrenceId: occurrenceId, phase: "cancelled")
       let hasAnotherActiveOccurrence = AlarmSchedulerOccurrenceStore.all(alarmId: alarmId).contains {
         ($0["occurrenceId"] as? String) != occurrenceId &&
@@ -202,9 +249,14 @@ extension AlarmSchedulerModule {
               hour: 0,
               minute: 0,
               weekdays: [],
-              soundName: soundName
+              soundName: soundName,
+              occurrenceId: occurrenceId
             ),
-            secondaryIntent: makeSecondaryIntent(id: alarmId, behavior: secondaryButtonBehaviorName),
+            secondaryIntent: makeSecondaryIntent(
+              id: alarmId,
+              behavior: secondaryButtonBehaviorName,
+              occurrenceId: occurrenceId
+            ),
             sound: makeAlarmSound(soundName)
           )
         )

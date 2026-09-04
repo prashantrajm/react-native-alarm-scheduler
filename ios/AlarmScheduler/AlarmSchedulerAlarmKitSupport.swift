@@ -81,6 +81,8 @@ struct AlarmSchedulerStopIntent: LiveActivityIntent {
   var weekdays: String
   @Parameter(title: "Sound Name")
   var soundName: String
+  @Parameter(title: "Occurrence ID")
+  var occurrenceId: String
 
   init() {
     alarmId = ""
@@ -90,9 +92,19 @@ struct AlarmSchedulerStopIntent: LiveActivityIntent {
     minute = 0
     weekdays = ""
     soundName = ""
+    occurrenceId = ""
   }
 
-  init(alarmId: String, behavior: String, title: String, hour: Int, minute: Int, weekdays: [Int], soundName: String?) {
+  init(
+    alarmId: String,
+    behavior: String,
+    title: String,
+    hour: Int,
+    minute: Int,
+    weekdays: [Int],
+    soundName: String?,
+    occurrenceId: String? = nil
+  ) {
     self.alarmId = alarmId
     self.behavior = behavior
     self.alarmTitle = title
@@ -100,13 +112,24 @@ struct AlarmSchedulerStopIntent: LiveActivityIntent {
     self.minute = minute
     self.weekdays = weekdays.map(String.init).joined(separator: ",")
     self.soundName = soundName ?? ""
+    self.occurrenceId = occurrenceId ?? ""
   }
 
   func perform() async throws -> some IntentResult {
+    let occurrence = occurrenceId.isEmpty
+      ? AlarmSchedulerOccurrenceStore.activatePrimaryOccurrence(alarmId: alarmId)
+      : AlarmSchedulerOccurrenceStore.markRinging(occurrenceId: occurrenceId)
+    if occurrence?["relationship"] as? String == "primary" {
+      AlarmSchedulerNativeAlarmStore.resetCompletion(alarmId: alarmId)
+    }
     let shouldReschedule = behavior == "rescheduleImmediate" && !AlarmSchedulerNativeAlarmStore.isComplete(alarmId: alarmId)
     var details: [String: Any] = [
       "foregroundRequested": true
     ]
+    if let resolvedOccurrenceId = occurrence?["occurrenceId"] as? String {
+      details["occurrenceId"] = resolvedOccurrenceId
+      details["relationship"] = occurrence?["relationship"] as? String ?? "primary"
+    }
     if shouldReschedule {
       let backupResult = await AlarmSchedulerRescheduler.scheduleBackup(
         originalAlarmId: alarmId,
@@ -136,17 +159,36 @@ struct AlarmSchedulerSecondaryOpenIntent: LiveActivityIntent {
 
   @Parameter(title: "Alarm ID")
   var alarmId: String
+  @Parameter(title: "Occurrence ID")
+  var occurrenceId: String
 
   init() {
     alarmId = ""
+    occurrenceId = ""
   }
 
-  init(alarmId: String) {
+  init(alarmId: String, occurrenceId: String? = nil) {
     self.alarmId = alarmId
+    self.occurrenceId = occurrenceId ?? ""
   }
 
   func perform() async throws -> some IntentResult {
-    _ = AlarmSchedulerNativeAlarmStore.recordIntentHandoff(alarmId: alarmId, action: "secondaryOpen")
+    let occurrence = occurrenceId.isEmpty
+      ? AlarmSchedulerOccurrenceStore.activatePrimaryOccurrence(alarmId: alarmId)
+      : AlarmSchedulerOccurrenceStore.markRinging(occurrenceId: occurrenceId)
+    if occurrence?["relationship"] as? String == "primary" {
+      AlarmSchedulerNativeAlarmStore.resetCompletion(alarmId: alarmId)
+    }
+    var details: [String: Any] = [:]
+    if let resolvedOccurrenceId = occurrence?["occurrenceId"] as? String {
+      details["occurrenceId"] = resolvedOccurrenceId
+      details["relationship"] = occurrence?["relationship"] as? String ?? "primary"
+    }
+    _ = AlarmSchedulerNativeAlarmStore.recordIntentHandoff(
+      alarmId: alarmId,
+      action: "secondaryOpen",
+      details: details
+    )
     return .result()
   }
 }
@@ -159,17 +201,36 @@ struct AlarmSchedulerSecondaryRecordIntent: LiveActivityIntent {
 
   @Parameter(title: "Alarm ID")
   var alarmId: String
+  @Parameter(title: "Occurrence ID")
+  var occurrenceId: String
 
   init() {
     alarmId = ""
+    occurrenceId = ""
   }
 
-  init(alarmId: String) {
+  init(alarmId: String, occurrenceId: String? = nil) {
     self.alarmId = alarmId
+    self.occurrenceId = occurrenceId ?? ""
   }
 
   func perform() async throws -> some IntentResult {
-    _ = AlarmSchedulerNativeAlarmStore.recordIntentHandoff(alarmId: alarmId, action: "secondaryOpen")
+    let occurrence = occurrenceId.isEmpty
+      ? AlarmSchedulerOccurrenceStore.activatePrimaryOccurrence(alarmId: alarmId)
+      : AlarmSchedulerOccurrenceStore.markRinging(occurrenceId: occurrenceId)
+    if occurrence?["relationship"] as? String == "primary" {
+      AlarmSchedulerNativeAlarmStore.resetCompletion(alarmId: alarmId)
+    }
+    var details: [String: Any] = [:]
+    if let resolvedOccurrenceId = occurrence?["occurrenceId"] as? String {
+      details["occurrenceId"] = resolvedOccurrenceId
+      details["relationship"] = occurrence?["relationship"] as? String ?? "primary"
+    }
+    _ = AlarmSchedulerNativeAlarmStore.recordIntentHandoff(
+      alarmId: alarmId,
+      action: "secondaryOpen",
+      details: details
+    )
     return .result()
   }
 }
@@ -284,9 +345,13 @@ enum AlarmSchedulerRescheduler {
             hour: 0,
             minute: 0,
             weekdays: [],
-            soundName: soundName
+            soundName: soundName,
+            occurrenceId: backupAlarmId
           ),
-          secondaryIntent: AlarmSchedulerSecondaryOpenIntent(alarmId: originalAlarmId),
+          secondaryIntent: AlarmSchedulerSecondaryOpenIntent(
+            alarmId: originalAlarmId,
+            occurrenceId: backupAlarmId
+          ),
           sound: makeAlarmSound(soundName)
         )
       )

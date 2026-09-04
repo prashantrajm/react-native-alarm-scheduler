@@ -45,7 +45,14 @@ const result = await AlarmScheduler.resolveAlarmOccurrenceAsync(occurrenceId, {
 ```
 
 `idempotencyKey` is strongly recommended for UI actions. Retrying the same resolution returns its
-original result instead of creating another occurrence.
+original result instead of creating another occurrence. The key is scoped to that concrete
+`occurrenceId`, so the same application key can safely be used for a later delivery of a repeating
+alarm.
+
+Every primary firing receives a new persisted `occurrenceId`; the durable alarm definition keeps
+its original `alarmId`. Resolving or cancelling the current primary stops that delivery without
+removing the repeating schedule. A subsequent primary therefore has an independent lifecycle and
+cannot return an earlier delivery's cached resolution.
 
 The result status is `resolved` when the requested transition completed. It is
 `resolvedWithoutNext` when the current occurrence was resolved but the operating system rejected
