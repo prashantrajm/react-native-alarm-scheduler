@@ -1,2 +1,2 @@
-export { default } from "./ExpoAlarmModule";
-export * from "./ExpoAlarm.types";
+export { AlarmScheduler, default } from "./AlarmSchedulerModule";
+export * from "./AlarmScheduler.types";

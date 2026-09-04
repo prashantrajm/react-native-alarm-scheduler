@@ -7,18 +7,78 @@
   the GitHub Release fall back to "See CHANGELOG.md for details."
 -->
 
+## 1.0.0
+
+This major release gives the package a platform-neutral module identity, adds atomic deferred and
+follow-up alarm occurrences, and lets users choose alarm audio at runtime. Existing build-time
+bundled sounds and the system default remain supported.
+
+### 🛠 Breaking changes
+
+- Rename the JavaScript and native module from `ExpoAlarm` to **`AlarmScheduler`**. Import the
+  package with `import AlarmScheduler from 'react-native-alarm-scheduler'`; a named
+  `AlarmScheduler` export is also available.
+- Rename the native registration, Android classes and components, iOS module and podspec to
+  `AlarmScheduler`. Apps upgrading to 1.0.0 must install dependencies and perform a full native
+  rebuild. Code that directly requires the old native module name must migrate to `AlarmScheduler`.
+- Remove the former alert-action mode alias. Use `alertActionMode: 'openAppOnly'`; unsupported mode
+  values now resolve to `default`.
+
+### 🎉 New features
+
+- Add first-class `silent` options for iOS and Android. Silent alarms preserve native presentation,
+  full-screen behavior, and independently configured vibration while suppressing audio; Android
+  also skips alarm-volume enforcement.
+- Bundle the iOS silent AlarmKit sound through the config plugin and fail scheduling closed if it is
+  unavailable, preventing an unintended fallback to the audible system sound.
+- Add `soundUri` to the shared schedule input and the `ios` and `android` option objects, allowing an
+  alarm to use audio selected or downloaded while the app is running.
+- Copy Android picker-backed audio into app-owned storage before scheduling, so playback does not
+  depend on a temporary document-provider permission. The foreground ring service loops the stored
+  file when the alarm fires.
+- Import iOS runtime audio into the app's `Library/Sounds` directory and transcode the first 29
+  seconds to an AlarmKit-compatible CAF file. Runtime custom sounds are used on physical devices;
+  the iOS Simulator falls back to the system sound because external AlarmKit sounds are not reliable
+  there.
+- Expose the resolved runtime `soundUri` and any custom-sound fallback reason through
+  `getNativeAlarmDebugStateAsync()`.
+- Add persistent occurrence records that separate a durable alarm definition from each native
+  delivery. Records expose an occurrence id, parent occurrence id, scheduled time, application
+  metadata, lifecycle phase, and `primary`, `deferred`, or `followUp` relationship.
+- Add `resolveAlarmOccurrenceAsync()` to stop and resolve an active occurrence, preserve one-shot
+  alarm definitions, cancel stale recovery timers, and optionally schedule a deferred or follow-up
+  occurrence as one native operation on Android and iOS.
+- Make occurrence resolution idempotent when an `idempotencyKey` is supplied, preventing repeated UI
+  actions or retries from creating duplicate deliveries.
+- Add `getAlarmOccurrencesAsync()` for querying occurrence history and
+  `cancelAlarmOccurrenceAsync()` for cancelling one scheduled occurrence without deleting its alarm
+  definition or sibling occurrences.
+- Include occurrence identity and relationship in native alarm context and events when known, and
+  restore scheduled deferred and follow-up occurrences after Android reboot, app update, or time
+  changes.
+
+### 🐛 Bug fixes
+
+- Schedule primary iOS alarms with an alert-only AlarmKit presentation. Countdown presentation is
+  now reserved for deferred and follow-up timer occurrences, preventing AlarmKit from rejecting a
+  primary alarm that has no countdown duration.
+
+### 💡 Others
+
+- Keep `soundName` and config-plugin bundled sounds available for alarms whose audio is known at
+  build time.
+- Split the iOS implementation into focused source files for actions, AlarmKit integration,
+  scheduling, storage, and occurrence lifecycle behavior.
+- Update the README, documentation site and packaged agent skill for the new module name, runtime
+  sound workflow, and occurrence APIs.
+
 ## 0.3.0
 
 Naming and documentation. No scheduling, ringing or completion logic changed.
 
-`alertActionMode: 'openMissionOnly'` still works, so no code change is required to upgrade.
-
 ### ♻️ Renamed
 
-- `alertActionMode: 'openMissionOnly'` is now **`'openAppOnly'`**. The old spelling is still accepted
-  on both platforms — including for alarms already persisted by an older build, so an app update
-  cannot silently hand those alarms a stop button — and will be removed in a future major. Whichever
-  you pass, `getNativeAlarmDebugStateAsync()` reports the canonical `openAppOnly`.
+- Rename the secondary-only alert action mode to **`openAppOnly`**.
 - The default secondary-button label for that mode changed from `"Start mission"` (Android) and
   `"Open"` (iOS) to **`"Open app"`** on both. Apps that set `secondaryButtonTitle` are unaffected.
 
@@ -150,7 +210,7 @@ runtime behavior, however, changes substantially — read this section before up
 
 ### 🎉 New features
 
-- Add iOS `alertActionMode: 'openMissionOnly'` to prefer AlarmKit's secondary-only alert presentation where supported.
+- Add an iOS alert action mode that prefers AlarmKit's secondary-only alert presentation where supported.
 - Expand `getNativeAlarmDebugStateAsync()` with AlarmKit alert/button configuration details.
 
 ## 0.1.4

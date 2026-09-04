@@ -112,9 +112,10 @@ jobs:
           echo "$files"
           for required in \
             "android/src/main/AndroidManifest.xml" \
-            "android/src/main/java/expo/modules/alarm/ExpoAlarmModule.kt" \
-            "android/src/main/java/expo/modules/alarm/ExpoAlarmRingService.kt" \
-            "ios/ExpoAlarmModule.swift" \
+            "android/src/main/java/expo/modules/alarm/AlarmSchedulerModule.kt" \
+            "android/src/main/java/expo/modules/alarm/AlarmSchedulerRingService.kt" \
+            "assets/alarm-scheduler-silence.caf" \
+            "ios/AlarmScheduler/AlarmSchedulerModule.swift" \
             "app.plugin.js" \
             "build/index.js" \
             "build/index.d.ts"

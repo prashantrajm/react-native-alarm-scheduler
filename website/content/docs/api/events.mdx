@@ -6,15 +6,15 @@ description: Foreground listeners, and why they are never the whole story.
 import { Callout } from 'fumadocs-ui/components/callout';
 
 ```ts
-const subscription = ExpoAlarm.addListener('onAlarmTriggered', (alarm) => {
+const subscription = AlarmScheduler.addListener('onAlarmTriggered', (alarm) => {
   console.log(alarm);
 });
 
-const actionSubscription = ExpoAlarm.addListener('onAlarmAction', (action) => {
+const actionSubscription = AlarmScheduler.addListener('onAlarmAction', (action) => {
   console.log(action);
 });
 
-const stateSubscription = ExpoAlarm.addListener('onAlarmStateChange', (event) => {
+const stateSubscription = AlarmScheduler.addListener('onAlarmStateChange', (event) => {
   console.log(event);
 });
 
@@ -26,7 +26,7 @@ stateSubscription.remove();
 ## Payloads
 
 ```ts
-type ExpoAlarmModuleEvents = {
+type AlarmSchedulerModuleEvents = {
   onAlarmTriggered: (alarm: ScheduledAlarm) => void;
   onAlarmAction: (action: AlarmAction) => void;
   onAlarmStateChange: (event: AlarmStateChange) => void;
@@ -34,6 +34,8 @@ type ExpoAlarmModuleEvents = {
 
 type AlarmStateChange = {
   id: string;
+  occurrenceId?: string;
+  relationship?: 'primary' | 'deferred' | 'followUp';
   state: 'scheduled' | 'alerting' | 'countdown' | 'paused';
   timestamp: number;
   metadata?: AlarmMetadata;

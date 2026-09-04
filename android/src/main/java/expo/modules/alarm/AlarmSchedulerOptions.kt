@@ -7,13 +7,6 @@ import kotlin.math.min
 internal const val ALERT_ACTION_MODE_DEFAULT = "default"
 internal const val ALERT_ACTION_MODE_OPEN_APP_ONLY = "openAppOnly"
 
-/**
- * Former name of [ALERT_ACTION_MODE_OPEN_APP_ONLY]. Still accepted from JS, and still read back out
- * of alarms persisted by older versions, so an app update must not quietly hand those alarms a stop
- * button. Normalized away on the way in; never written back out.
- */
-internal const val ALERT_ACTION_MODE_OPEN_APP_ONLY_LEGACY = "openMissionOnly"
-
 internal const val STOP_BEHAVIOR_RECORD_ONLY = "recordOnly"
 internal const val STOP_BEHAVIOR_OPEN_APP = "openApp"
 internal const val STOP_BEHAVIOR_RESCHEDULE = "rescheduleImmediate"
@@ -32,7 +25,7 @@ internal const val FULL_SCREEN_TARGET_APP = "app"
  * `ios.metadata`, `ios.alertActionMode: 'openAppOnly'`,
  * `ios.stopIntentBehavior: 'rescheduleImmediate'` — behave the same on Android with no JS changes.
  */
-internal data class ExpoAlarmOptions(
+internal data class AlarmSchedulerOptions(
   val metadata: JSONObject,
   val alertTitle: String,
   val alertBody: String,
@@ -43,6 +36,7 @@ internal data class ExpoAlarmOptions(
   val secondaryButtonBehavior: String,
   val soundName: String?,
   val soundUri: String?,
+  val silent: Boolean,
   val vibrate: Boolean,
   val enforceVolume: Boolean,
   val restoreVolume: Boolean,
@@ -64,6 +58,7 @@ internal data class ExpoAlarmOptions(
     .put("secondaryButtonBehavior", secondaryButtonBehavior)
     .put("soundName", soundName ?: JSONObject.NULL)
     .put("soundUri", soundUri ?: JSONObject.NULL)
+    .put("silent", silent)
     .put("vibrate", vibrate)
     .put("enforceVolume", enforceVolume)
     .put("restoreVolume", restoreVolume)
@@ -81,10 +76,11 @@ internal data class ExpoAlarmOptions(
     fun resolve(
       title: String,
       alarmId: String,
+      soundUri: String?,
       android: AndroidAlarmOptionsRecord?,
       ios: IosAlarmOptionsRecord?
-    ): ExpoAlarmOptions {
-      val metadata = ExpoAlarmJson.fromMap(android?.metadata ?: ios?.metadata)
+    ): AlarmSchedulerOptions {
+      val metadata = AlarmSchedulerJson.fromMap(android?.metadata ?: ios?.metadata)
       metadata.put("alarmId", alarmId)
       metadata.put("title", title)
 
@@ -92,7 +88,7 @@ internal data class ExpoAlarmOptions(
       val secondaryButtonTitle = firstNonBlank(android?.secondaryButtonTitle, ios?.secondaryButtonTitle)
         ?: if (alertActionMode == ALERT_ACTION_MODE_OPEN_APP_ONLY) "Open app" else "Open"
 
-      return ExpoAlarmOptions(
+      return AlarmSchedulerOptions(
         metadata = metadata,
         alertTitle = firstNonBlank(android?.alertTitle, ios?.alertTitle) ?: title,
         alertBody = firstNonBlank(android?.alertBody) ?: "Alarm",
@@ -104,7 +100,8 @@ internal data class ExpoAlarmOptions(
           android?.secondaryButtonBehavior ?: ios?.secondaryButtonBehavior
         ),
         soundName = firstNonBlank(android?.soundName, ios?.soundName),
-        soundUri = firstNonBlank(android?.soundUri),
+        soundUri = firstNonBlank(android?.soundUri, soundUri, ios?.soundUri),
+        silent = android?.silent ?: ios?.silent ?: false,
         vibrate = android?.vibrate ?: true,
         enforceVolume = android?.enforceVolume ?: true,
         restoreVolume = android?.restoreVolume ?: true,
@@ -117,9 +114,9 @@ internal data class ExpoAlarmOptions(
       )
     }
 
-    fun fromJson(json: JSONObject?, title: String, alarmId: String): ExpoAlarmOptions {
+    fun fromJson(json: JSONObject?, title: String, alarmId: String): AlarmSchedulerOptions {
       if (json == null) {
-        return resolve(title, alarmId, null, null)
+        return resolve(title, alarmId, null, null, null)
       }
       val metadata = json.optJSONObject("metadata") ?: JSONObject()
       metadata.put("alarmId", alarmId)
@@ -127,7 +124,7 @@ internal data class ExpoAlarmOptions(
         metadata.put("title", title)
       }
       val alertActionMode = normalizeAlertActionMode(json.optStringOrNull("alertActionMode"))
-      return ExpoAlarmOptions(
+      return AlarmSchedulerOptions(
         metadata = metadata,
         alertTitle = json.optStringOrNull("alertTitle") ?: title,
         alertBody = json.optStringOrNull("alertBody") ?: "Alarm",
@@ -139,6 +136,7 @@ internal data class ExpoAlarmOptions(
         secondaryButtonBehavior = normalizeSecondaryButtonBehavior(json.optStringOrNull("secondaryButtonBehavior")),
         soundName = json.optStringOrNull("soundName"),
         soundUri = json.optStringOrNull("soundUri"),
+        silent = json.optBoolean("silent", false),
         vibrate = json.optBoolean("vibrate", true),
         enforceVolume = json.optBoolean("enforceVolume", true),
         restoreVolume = json.optBoolean("restoreVolume", true),
@@ -155,8 +153,7 @@ internal data class ExpoAlarmOptions(
     }
 
     private fun normalizeAlertActionMode(value: String?): String = when (value) {
-      ALERT_ACTION_MODE_OPEN_APP_ONLY, ALERT_ACTION_MODE_OPEN_APP_ONLY_LEGACY ->
-        ALERT_ACTION_MODE_OPEN_APP_ONLY
+      ALERT_ACTION_MODE_OPEN_APP_ONLY -> ALERT_ACTION_MODE_OPEN_APP_ONLY
       else -> ALERT_ACTION_MODE_DEFAULT
     }
 

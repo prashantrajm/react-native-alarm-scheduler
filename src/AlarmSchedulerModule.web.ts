@@ -4,14 +4,17 @@ import type {
   AlarmPermissionResponse,
   AlarmAction,
   AlarmContext,
+  AlarmOccurrence,
+  AlarmOccurrenceResolution,
+  AlarmOccurrenceResolutionResult,
   AlarmScheduleInput,
-  ExpoAlarmModuleEvents,
+  AlarmSchedulerModuleEvents,
   NativeAlarmBackupResult,
   NativeAlarmDebugState,
   ScheduledAlarm,
-} from "./ExpoAlarm.types";
+} from "./AlarmScheduler.types";
 
-class ExpoAlarmModule extends NativeModule<ExpoAlarmModuleEvents> {
+class AlarmSchedulerModule extends NativeModule<AlarmSchedulerModuleEvents> {
   async getPermissionsAsync(): Promise<AlarmPermissionResponse> {
     return this.unavailablePermission();
   }
@@ -61,6 +64,28 @@ class ExpoAlarmModule extends NativeModule<ExpoAlarmModuleEvents> {
   async clearPendingNativeAlarmHandoffAsync(): Promise<void> {}
 
   async completeNativeAlarmAsync(_alarmId: string): Promise<void> {}
+
+  async resolveAlarmOccurrenceAsync(
+    occurrenceId: string,
+    resolution: AlarmOccurrenceResolution,
+  ): Promise<AlarmOccurrenceResolutionResult> {
+    return {
+      alarmId: occurrenceId,
+      resolvedOccurrenceId: occurrenceId,
+      outcome: resolution.outcome,
+      status: resolution.next ? "resolvedWithoutNext" : "resolved",
+    };
+  }
+
+  async getAlarmOccurrencesAsync(
+    _alarmId?: string,
+  ): Promise<AlarmOccurrence[]> {
+    return [];
+  }
+
+  async cancelAlarmOccurrenceAsync(_occurrenceId: string): Promise<boolean> {
+    return false;
+  }
 
   async scheduleNativeAlarmBackupAsync(
     alarmId: string,
@@ -124,4 +149,9 @@ class ExpoAlarmModule extends NativeModule<ExpoAlarmModuleEvents> {
   }
 }
 
-export default registerWebModule(ExpoAlarmModule, "ExpoAlarm");
+export const AlarmScheduler = registerWebModule(
+  AlarmSchedulerModule,
+  "AlarmScheduler",
+);
+
+export default AlarmScheduler;

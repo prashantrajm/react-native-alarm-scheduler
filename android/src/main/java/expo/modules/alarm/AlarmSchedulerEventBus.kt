@@ -5,10 +5,10 @@ import org.json.JSONObject
 /**
  * Bridges the broadcast receiver / foreground service back to the JS module when — and only
  * when — a React context happens to be alive. Everything emitted here is also persisted by
- * [ExpoAlarmStore], so a cold-launched app can replay the same information through
+ * [AlarmSchedulerStore], so a cold-launched app can replay the same information through
  * `getPendingNativeAlarmHandoffAsync()` / `getPendingAlarmActionsAsync()`.
  */
-internal object ExpoAlarmEventBus {
+internal object AlarmSchedulerEventBus {
   internal interface Listener {
     fun onAlarmTriggered(alarm: Map<String, Any>)
     fun onAlarmAction(action: Map<String, Any>)
@@ -28,10 +28,15 @@ internal object ExpoAlarmEventBus {
   }
 
   fun emitAction(action: JSONObject) {
-    listener?.onAlarmAction(ExpoAlarmJson.toMap(action))
+    listener?.onAlarmAction(AlarmSchedulerJson.toMap(action))
   }
 
-  fun emitStateChange(alarmId: String, state: String, metadata: JSONObject?) {
+  fun emitStateChange(
+    alarmId: String,
+    state: String,
+    metadata: JSONObject?,
+    occurrence: JSONObject? = null
+  ) {
     val event = JSONObject()
       .put("id", alarmId)
       .put("state", state)
@@ -39,6 +44,10 @@ internal object ExpoAlarmEventBus {
     if (metadata != null) {
       event.put("metadata", metadata)
     }
-    listener?.onAlarmStateChange(ExpoAlarmJson.toMap(event))
+    occurrence?.let {
+      event.put("occurrenceId", it.optString("occurrenceId"))
+      event.put("relationship", it.optString("relationship"))
+    }
+    listener?.onAlarmStateChange(AlarmSchedulerJson.toMap(event))
   }
 }

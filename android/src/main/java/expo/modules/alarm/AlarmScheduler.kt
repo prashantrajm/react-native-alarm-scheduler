@@ -13,7 +13,7 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToLong
 
-internal object ExpoAlarmScheduler {
+internal object AlarmSchedulerScheduler {
   const val ACTION_TRIGGERED = "expo.modules.alarm.ALARM_TRIGGERED"
   const val EXTRA_ID = "expo.modules.alarm.extra.ID"
   const val EXTRA_IS_BACKUP = "expo.modules.alarm.extra.IS_BACKUP"
@@ -27,43 +27,80 @@ internal object ExpoAlarmScheduler {
     val minute = requireMinute(alarm.minute)
     val title = alarm.title?.takeIf { it.isNotBlank() } ?: "Alarm"
     val weekdays = normalizeWeekdays(alarm.weekdays)
-    val options = ExpoAlarmOptions.resolve(title, id, alarm.android, alarm.ios)
+    var options = AlarmSchedulerOptions.resolve(title, id, alarm.soundUri, alarm.android, alarm.ios)
+    options = if (options.silent) {
+      AlarmSchedulerSoundStore.delete(context, id)
+      options.copy(soundName = null, soundUri = null)
+    } else if (options.soundUri != null) {
+      options.copy(soundUri = AlarmSchedulerSoundStore.import(context, id, options.soundUri).toString())
+    } else {
+      AlarmSchedulerSoundStore.delete(context, id)
+      options
+    }
     val triggerAtMillis = alarm.timestamp?.toLong()?.takeIf { it > System.currentTimeMillis() }
       ?: nextTriggerAtMillis(hour, minute, weekdays)
 
     // A freshly scheduled alarm is never "already completed".
-    ExpoAlarmStore.resetCompletion(context, id)
+    AlarmSchedulerStore.resetCompletion(context, id)
     cancelBackups(context, id)
+    AlarmSchedulerOccurrenceStore.all(context, id)
+      .filter { it.optString("phase") == "scheduled" || it.optString("phase") == "ringing" }
+      .forEach { AlarmSchedulerOccurrenceStore.updatePhase(context, it.optString("occurrenceId"), "cancelled") }
 
     val stored = JSONObject()
       .put("id", id)
       .put("hour", hour)
       .put("minute", minute)
       .put("title", title)
-      .put("weekdays", ExpoAlarmJson.fromIntList(weekdays))
+      .put("weekdays", AlarmSchedulerJson.fromIntList(weekdays))
       .put("timestamp", triggerAtMillis)
       .put("platform", "android")
       .put("metadata", options.metadata)
       .put("options", options.toJson())
 
-    ExpoAlarmStore.saveAlarm(context, stored)
+    AlarmSchedulerStore.saveAlarm(context, stored)
+    AlarmSchedulerOccurrenceStore.save(
+      context,
+      JSONObject()
+        .put("occurrenceId", id)
+        .put("alarmId", id)
+        .put("scheduledFor", triggerAtMillis)
+        .put("relationship", "primary")
+        .put("phase", "scheduled")
+        .put("metadata", options.metadata)
+    )
     armExact(context, id, triggerAtMillis, isBackup = false, backupId = null)
-    ExpoAlarmEventBus.emitStateChange(id, "scheduled", options.metadata)
+    AlarmSchedulerEventBus.emitStateChange(id, "scheduled", options.metadata)
     return serialize(stored)
   }
 
   fun cancel(context: Context, id: String): Boolean {
-    val existing = ExpoAlarmStore.alarm(context, id)
+    val existing = AlarmSchedulerStore.alarm(context, id)
     disarm(context, requestCode(id), triggerIntent(context, id, isBackup = false, backupId = null))
     cancelBackups(context, id)
-    ExpoAlarmRingService.stopIfRinging(context, id)
-    ExpoAlarmStore.resetCompletion(context, id)
-    ExpoAlarmStore.clearActionsForAlarm(context, id)
-    val removed = ExpoAlarmStore.removeAlarm(context, id)
+    AlarmSchedulerRingService.stopIfRinging(context, id)
+    AlarmSchedulerStore.resetCompletion(context, id)
+    AlarmSchedulerStore.clearActionsForAlarm(context, id)
+    AlarmSchedulerOccurrenceStore.all(context, id)
+      .filter { it.optString("phase") == "scheduled" || it.optString("phase") == "ringing" }
+      .forEach { AlarmSchedulerOccurrenceStore.updatePhase(context, it.optString("occurrenceId"), "cancelled") }
+    val removed = AlarmSchedulerStore.removeAlarm(context, id)
+    AlarmSchedulerSoundStore.delete(context, id)
     return existing != null || removed
   }
 
-  fun getAll(context: Context): List<Map<String, Any>> = ExpoAlarmStore.alarms(context).map(::serialize)
+  fun getAll(context: Context): List<Map<String, Any>> = AlarmSchedulerStore.alarms(context)
+    .filter { stored ->
+      val alarmId = stored.optString("id")
+      val occurrences = AlarmSchedulerOccurrenceStore.all(context, alarmId)
+      AlarmSchedulerJson.intList(stored.optJSONArray("weekdays")).isNotEmpty() ||
+        occurrences.isEmpty() ||
+        occurrences.any {
+          it.optString("relationship") == "primary" &&
+            (it.optString("phase") == "scheduled" || it.optString("phase") == "ringing")
+        }
+    }
+    .map(::serialize)
 
   fun serialize(stored: JSONObject): Map<String, Any> {
     val result = mutableMapOf<String, Any>(
@@ -71,11 +108,11 @@ internal object ExpoAlarmScheduler {
       "hour" to stored.optInt("hour"),
       "minute" to stored.optInt("minute"),
       "title" to stored.optString("title", "Alarm"),
-      "weekdays" to ExpoAlarmJson.intList(stored.optJSONArray("weekdays")),
+      "weekdays" to AlarmSchedulerJson.intList(stored.optJSONArray("weekdays")),
       "timestamp" to stored.optLong("timestamp"),
       "platform" to "android"
     )
-    stored.optJSONObject("metadata")?.let { result["metadata"] = ExpoAlarmJson.toMap(it) }
+    stored.optJSONObject("metadata")?.let { result["metadata"] = AlarmSchedulerJson.toMap(it) }
     return result
   }
 
@@ -85,9 +122,10 @@ internal object ExpoAlarmScheduler {
   fun handleTriggered(context: Context, intent: Intent) {
     val id = intent.getStringExtra(EXTRA_ID) ?: return
     val isBackup = intent.getBooleanExtra(EXTRA_IS_BACKUP, false)
-    val stored = ExpoAlarmStore.alarm(context, id)
+    val occurrenceId = intent.getStringExtra(EXTRA_BACKUP_ID) ?: id
+    val stored = AlarmSchedulerStore.alarm(context, id)
 
-    if (isBackup && ExpoAlarmStore.isComplete(context, id)) {
+    if (isBackup && AlarmSchedulerStore.isComplete(context, id)) {
       // The app completed the alarm between arming the backup and it firing. Stay quiet.
       cancelBackups(context, id)
       return
@@ -99,11 +137,12 @@ internal object ExpoAlarmScheduler {
     }
 
     if (!isBackup) {
-      ExpoAlarmStore.resetCompletion(context, id)
+      AlarmSchedulerStore.resetCompletion(context, id)
       rescheduleRepeatIfNeeded(context, stored)
     }
+    AlarmSchedulerOccurrenceStore.updatePhase(context, occurrenceId, "ringing")
 
-    val options = ExpoAlarmOptions.fromJson(
+    val options = AlarmSchedulerOptions.fromJson(
       stored.optJSONObject("options"),
       stored.optString("title", "Alarm"),
       id
@@ -111,16 +150,24 @@ internal object ExpoAlarmScheduler {
 
     // Persisted before anything that can fail, so however badly the presentation degrades, a
     // launched app can still find out which alarm fired and route to its own UI.
-    ExpoAlarmStore.recordHandoff(
+    AlarmSchedulerStore.recordHandoff(
       context = context,
       alarmId = id,
       action = "secondaryOpen",
       details = mapOf("foregroundRequested" to true, "trigger" to true)
     )
-    ExpoAlarmEventBus.emitTriggered(serialize(stored))
-    ExpoAlarmStore.setActiveRingAlarmId(context, id)
+    val triggered = serialize(stored).toMutableMap()
+    AlarmSchedulerOccurrenceStore.occurrence(context, occurrenceId)?.let { occurrence ->
+      triggered["occurrenceId"] = occurrenceId
+      triggered["relationship"] = occurrence.optString("relationship", "primary")
+      occurrence.optJSONObject("metadata")?.let { metadata ->
+        triggered["metadata"] = AlarmSchedulerJson.toMap(metadata)
+      }
+    }
+    AlarmSchedulerEventBus.emitTriggered(triggered)
+    AlarmSchedulerStore.setActiveRingAlarmId(context, id)
 
-    if (!ExpoAlarmRingService.start(context, id, isBackup)) {
+    if (!AlarmSchedulerRingService.start(context, id, isBackup, occurrenceId)) {
       presentWithoutService(context, id, options)
     }
   }
@@ -129,50 +176,62 @@ internal object ExpoAlarmScheduler {
    * The service could not be started. Ring through a notification channel and try the activity
    * directly — less reliable than the service, but far better than silence.
    */
-  private fun presentWithoutService(context: Context, id: String, options: ExpoAlarmOptions) {
-    ExpoAlarmNotifications.postFallbackNotification(context, id, options)
+  private fun presentWithoutService(context: Context, id: String, options: AlarmSchedulerOptions) {
+    AlarmSchedulerNotifications.postFallbackNotification(context, id, options)
     if (!options.fullScreen) {
       return
     }
     val intent = if (options.fullScreenTarget == FULL_SCREEN_TARGET_APP) {
-      ExpoAlarmNotifications.appIntent(context, id, options)
+      AlarmSchedulerNotifications.appIntent(context, id, options)
     } else {
-      ExpoAlarmRingActivity.intent(context, id)
+      AlarmSchedulerRingActivity.intent(context, id)
     } ?: return
     runCatching { context.startActivity(intent) }
   }
 
   fun rescheduleAll(context: Context) {
     val now = System.currentTimeMillis()
-    ExpoAlarmStore.alarms(context).forEach { stored ->
+    AlarmSchedulerStore.alarms(context).forEach { stored ->
       val id = stored.optString("id").takeIf { it.isNotBlank() } ?: return@forEach
-      val weekdays = ExpoAlarmJson.intList(stored.optJSONArray("weekdays"))
+      val relatedOccurrences = AlarmSchedulerOccurrenceStore.all(context, id).filter {
+        it.optString("relationship") != "primary" && it.optString("phase") == "scheduled"
+      }
+      relatedOccurrences.forEach { occurrence ->
+        val occurrenceId = occurrence.optString("occurrenceId")
+        val scheduledFor = max(now + 100, occurrence.optLong("scheduledFor"))
+        occurrence.put("scheduledFor", scheduledFor)
+        AlarmSchedulerOccurrenceStore.save(context, occurrence)
+        scheduleRelatedOccurrence(context, id, occurrenceId, scheduledFor)
+      }
+      val weekdays = AlarmSchedulerJson.intList(stored.optJSONArray("weekdays"))
       val timestamp = stored.optLong("timestamp")
       val triggerAtMillis = when {
         timestamp > now -> timestamp
         weekdays.isNotEmpty() -> nextTriggerAtMillis(stored.optInt("hour"), stored.optInt("minute"), weekdays)
+        relatedOccurrences.isNotEmpty() -> return@forEach
         else -> {
           // A one-shot alarm whose time passed while the device was off is dropped, matching the
           // behaviour of the system Clock app.
-          ExpoAlarmStore.removeAlarm(context, id)
+          AlarmSchedulerStore.removeAlarm(context, id)
+          AlarmSchedulerSoundStore.delete(context, id)
           return@forEach
         }
       }
       stored.put("timestamp", triggerAtMillis)
-      ExpoAlarmStore.saveAlarm(context, stored)
+      AlarmSchedulerStore.saveAlarm(context, stored)
       armExact(context, id, triggerAtMillis, isBackup = false, backupId = null)
     }
   }
 
   private fun rescheduleRepeatIfNeeded(context: Context, stored: JSONObject) {
     val id = stored.optString("id")
-    val weekdays = ExpoAlarmJson.intList(stored.optJSONArray("weekdays"))
+    val weekdays = AlarmSchedulerJson.intList(stored.optJSONArray("weekdays"))
     if (weekdays.isEmpty()) {
       return
     }
     val next = nextTriggerAtMillis(stored.optInt("hour"), stored.optInt("minute"), weekdays)
     stored.put("timestamp", next)
-    ExpoAlarmStore.saveAlarm(context, stored)
+    AlarmSchedulerStore.saveAlarm(context, stored)
     armExact(context, id, next, isBackup = false, backupId = null)
   }
 
@@ -181,8 +240,8 @@ internal object ExpoAlarmScheduler {
   fun backupAlarmId(alarmId: String): String = alarmId + BACKUP_SUFFIX
 
   fun scheduleBackup(context: Context, alarmId: String, delaySeconds: Double?): Map<String, Any> {
-    val stored = ExpoAlarmStore.alarm(context, alarmId)
-    val options = ExpoAlarmOptions.fromJson(
+    val stored = AlarmSchedulerStore.alarm(context, alarmId)
+    val options = AlarmSchedulerOptions.fromJson(
       stored?.optJSONObject("options"),
       stored?.optString("title") ?: "Alarm",
       alarmId
@@ -190,7 +249,7 @@ internal object ExpoAlarmScheduler {
     val normalizedDelay = max(0.1, delaySeconds ?: options.backupDelaySeconds)
     val backupId = backupAlarmId(alarmId)
 
-    if (stored == null || ExpoAlarmStore.isComplete(context, alarmId)) {
+    if (stored == null || AlarmSchedulerStore.isComplete(context, alarmId)) {
       return mapOf(
         "alarmId" to alarmId,
         "backupAlarmId" to backupId,
@@ -202,7 +261,7 @@ internal object ExpoAlarmScheduler {
     val scheduledFor = System.currentTimeMillis() + (normalizedDelay * 1000).roundToLong()
     val scheduled = armExact(context, alarmId, scheduledFor, isBackup = true, backupId = backupId)
     if (scheduled) {
-      ExpoAlarmStore.addRetryAlarmId(context, backupId, alarmId)
+      AlarmSchedulerStore.addRetryAlarmId(context, backupId, alarmId)
     }
 
     val result = mutableMapOf<String, Any>(
@@ -220,9 +279,41 @@ internal object ExpoAlarmScheduler {
   fun cancelBackups(context: Context, alarmId: String): Boolean {
     val backupId = backupAlarmId(alarmId)
     disarm(context, requestCode(backupId), triggerIntent(context, alarmId, isBackup = true, backupId = backupId))
-    val hadRetries = ExpoAlarmStore.retryAlarmIds(context, alarmId).isNotEmpty()
-    ExpoAlarmStore.clearRetryAlarmIds(context, alarmId)
+    val retryIds = AlarmSchedulerStore.retryAlarmIds(context, alarmId)
+    retryIds.filter { it != backupId }.forEach { retryId ->
+      disarm(context, requestCode(retryId), triggerIntent(context, alarmId, isBackup = true, backupId = retryId))
+    }
+    val hadRetries = retryIds.isNotEmpty()
+    AlarmSchedulerStore.clearRetryAlarmIds(context, alarmId)
     return hadRetries
+  }
+
+  fun scheduleRelatedOccurrence(
+    context: Context,
+    alarmId: String,
+    occurrenceId: String,
+    scheduledFor: Long
+  ): Boolean {
+    val scheduled = armExact(context, alarmId, scheduledFor, isBackup = true, backupId = occurrenceId)
+    if (scheduled) {
+      AlarmSchedulerStore.addRetryAlarmId(context, occurrenceId, alarmId)
+    }
+    return scheduled
+  }
+
+  fun cancelRelatedOccurrence(context: Context, alarmId: String, occurrenceId: String) {
+    val isPrimary = occurrenceId == alarmId
+    disarm(
+      context,
+      requestCode(occurrenceId),
+      triggerIntent(
+        context,
+        alarmId,
+        isBackup = !isPrimary,
+        backupId = occurrenceId.takeUnless { isPrimary }
+      )
+    )
+    AlarmSchedulerStore.removeRetryAlarmId(context, occurrenceId, alarmId)
   }
 
   // endregion
@@ -279,11 +370,11 @@ internal object ExpoAlarmScheduler {
   }
 
   private fun triggerIntent(context: Context, alarmId: String, isBackup: Boolean, backupId: String?): Intent {
-    return Intent(context, ExpoAlarmReceiver::class.java).apply {
+    return Intent(context, AlarmSchedulerReceiver::class.java).apply {
       action = ACTION_TRIGGERED
       // PendingIntent.filterEquals() ignores extras, so the discriminating id goes in the data URI
       // to keep the primary and the backup PendingIntents distinct.
-      data = Uri.parse("expo-alarm://${backupId ?: alarmId}")
+      data = Uri.parse("alarm-scheduler://${backupId ?: alarmId}")
       putExtra(EXTRA_ID, alarmId)
       putExtra(EXTRA_IS_BACKUP, isBackup)
       if (backupId != null) {

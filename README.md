@@ -23,7 +23,8 @@ schedules an actual alarm.
 - 📱 **Full-screen lock-screen ringing UI** backed by a foreground service, so a killed app still rings.
 - 🔁 **Survives reboots**, app updates, and clock/timezone changes.
 - 🧭 **Cold-launch handoff records** written natively before any JS runs, so your app always knows why it opened.
-- 🎵 **Custom alarm sounds** on both platforms, bundled by the config plugin.
+- 🎵 **User-selected alarm sounds** — pass a picker URI at runtime; each alarm can use a different local audio file.
+- 🔇 **Silent alarms** — suppress audio while preserving native alarm presentation and optional vibration.
 - 🕐 **System Clock integration** on Android via `ACTION_SET_ALARM` and `ACTION_SHOW_ALARMS`.
 - 🧩 **Expo config plugin** for permissions and `NSAlarmKitUsageDescription`.
 - 🔷 **Fully typed** TypeScript API, with explicit unavailable behavior where the OS cannot schedule alarms.
@@ -76,29 +77,29 @@ All plugin options are listed in the [installation docs](https://react-native-al
 ## Usage
 
 ```ts
-import ExpoAlarm from 'react-native-alarm-scheduler';
+import AlarmScheduler from 'react-native-alarm-scheduler';
 
-const permissions = await ExpoAlarm.requestPermissionsAsync();
+const permissions = await AlarmScheduler.requestPermissionsAsync();
 
 if (permissions.canScheduleExactAlarms) {
-  const alarm = await ExpoAlarm.scheduleAlarmAsync({
+  const alarm = await AlarmScheduler.scheduleAlarmAsync({
     hour: 7,
     minute: 30,
     title: 'Morning alarm',
     weekdays: [1, 2, 3, 4, 5], // ISO: 1 = Monday, 7 = Sunday
   });
 
-  await ExpoAlarm.cancelAlarmAsync(alarm.id);
+  await AlarmScheduler.cancelAlarmAsync(alarm.id);
 }
 ```
 
 List and cancel what you scheduled:
 
 ```ts
-const alarms = await ExpoAlarm.getScheduledAlarmsAsync();
+const alarms = await AlarmScheduler.getScheduledAlarmsAsync();
 
 for (const alarm of alarms) {
-  await ExpoAlarm.cancelAlarmAsync(alarm.id);
+  await AlarmScheduler.cancelAlarmAsync(alarm.id);
 }
 ```
 
@@ -109,13 +110,13 @@ alive — which it is not on a cold launch from the lock screen. Everything they
 natively before any JS runs, so reconcile from the async getters on every launch and foreground:
 
 ```ts
-const handoff = await ExpoAlarm.getPendingNativeAlarmHandoffAsync();
-const context = handoff ? null : await ExpoAlarm.getCurrentAlarmContextAsync();
+const handoff = await AlarmScheduler.getPendingNativeAlarmHandoffAsync();
+const context = handoff ? null : await AlarmScheduler.getCurrentAlarmContextAsync();
 const alarmId = handoff?.alarmId ?? context?.id;
 
 if (alarmId) {
   router.replace(`/alarm/${alarmId}`);
-  await ExpoAlarm.clearPendingNativeAlarmHandoffAsync();
+  await AlarmScheduler.clearPendingNativeAlarmHandoffAsync();
 }
 ```
 
@@ -128,7 +129,7 @@ opens your app, and the alarm keeps ringing until you call `completeNativeAlarmA
 Useful when "the user pressed stop" is not proof of anything:
 
 ```ts
-await ExpoAlarm.scheduleAlarmAsync({
+await AlarmScheduler.scheduleAlarmAsync({
   hour: 7,
   minute: 0,
   title: 'Wake up',
@@ -147,9 +148,11 @@ The guarantee is absolute on Android and best-effort on iOS — see
 | --- | :---: | :---: |
 | Schedule, list and cancel app-owned alarms | ✅ | ✅ |
 | Permissions and settings surfaces | ✅ | ✅ |
-| Custom alarm sound | ✅ | ✅ |
+| Custom alarm sound | ✅ | ✅ physical device; system default in Simulator |
+| Silent alarm | ✅ | ✅ physical device; rejected in Simulator |
 | Ring until the app says stop (`openAppOnly`) | ✅ | ⚠️ |
 | Cold-launch handoff, action records, backup alarms | ✅ | ✅ |
+| Deferred and follow-up alarm occurrences | ✅ | ✅ |
 | Survive reboot | ✅ | ✅ |
 | Create an alarm in the system Clock app | ✅ | ❌ |
 | Open the system alarm app | ✅ | ❌ |
@@ -160,6 +163,26 @@ cannot remove; `stopIntentBehavior: 'rescheduleImmediate'` re-arms behind it.
 
 On web, `scheduleAlarmAsync` and `setSystemAlarmAsync` throw; every other method resolves to an
 explicit unavailable or no-op result, so a universal app still compiles and runs.
+
+## Deferred and follow-up occurrences
+
+Resolve a ringing occurrence and create its next delivery without re-registering the alarm
+definition in application code:
+
+```ts
+await AlarmScheduler.resolveAlarmOccurrenceAsync(occurrenceId, {
+  outcome: 'deferred',
+  next: {
+    delaySeconds: 5 * 60,
+    relationship: 'deferred',
+  },
+  idempotencyKey: `defer:${occurrenceId}:1`,
+});
+```
+
+Use `relationship: 'followUp'` with `outcome: 'completed'` to schedule another delivery after the
+current occurrence is complete. See
+[Alarm occurrences](https://react-native-alarm-scheduler.vercel.app/api/occurrences).
 
 ## Contributing
 

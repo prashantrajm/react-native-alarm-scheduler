@@ -11,8 +11,9 @@ const fs = require('fs');
 const path = require('path');
 
 const pkg = require('./package.json');
+const silentSoundPath = path.join(__dirname, 'assets', 'alarm-scheduler-silence.caf');
 
-const withExpoAlarm = (config, props = {}) => {
+const withAlarmScheduler = (config, props = {}) => {
   const alarmKitUsageDescription =
     props.alarmKitUsageDescription ||
     'Allow this app to schedule alarms that can alert you at the selected time.';
@@ -44,34 +45,35 @@ const withExpoAlarm = (config, props = {}) => {
     return modConfig;
   });
 
-  if (iosAlarmSounds.length > 0) {
-    config = withXcodeProject(config, (modConfig) => {
-      const project = modConfig.modResults;
-      const projectRoot = modConfig.modRequest.projectRoot;
-      const platformProjectRoot = modConfig.modRequest.platformProjectRoot;
-      IOSConfig.XcodeUtils.ensureGroupRecursively(project, 'Resources');
+  config = withXcodeProject(config, (modConfig) => {
+    const project = modConfig.modResults;
+    const projectRoot = modConfig.modRequest.projectRoot;
+    const platformProjectRoot = modConfig.modRequest.platformProjectRoot;
+    IOSConfig.XcodeUtils.ensureGroupRecursively(project, 'Resources');
+    const sounds = [
+      { absolutePath: silentSoundPath, label: 'bundled silent alarm sound' },
+      ...iosAlarmSounds.map((sound) => ({
+        absolutePath: path.resolve(projectRoot, sound),
+        label: sound,
+      })),
+    ];
 
-      iosAlarmSounds.forEach((sound) => {
-        const absolutePath = path.resolve(projectRoot, sound);
-        if (!fs.existsSync(absolutePath)) {
-          throw new PluginError(
-            `Alarm sound file does not exist: ${sound}`,
-            pkg.name
-          );
-        }
+    sounds.forEach(({ absolutePath, label }) => {
+      if (!fs.existsSync(absolutePath)) {
+        throw new PluginError(`Alarm sound file does not exist: ${label}`, pkg.name);
+      }
 
-        IOSConfig.XcodeUtils.addResourceFileToGroup({
-          filepath: path.relative(platformProjectRoot, absolutePath),
-          groupName: 'Resources',
-          project,
-          isBuildFile: true,
-          verbose: true,
-        });
+      IOSConfig.XcodeUtils.addResourceFileToGroup({
+        filepath: path.relative(platformProjectRoot, absolutePath),
+        groupName: 'Resources',
+        project,
+        isBuildFile: true,
+        verbose: true,
       });
-
-      return modConfig;
     });
-  }
+
+    return modConfig;
+  });
 
   return config;
 };
@@ -86,4 +88,4 @@ function normalizeIosAlarmSounds(value) {
   return value;
 }
 
-module.exports = createRunOncePlugin(withExpoAlarm, pkg.name, pkg.version);
+module.exports = createRunOncePlugin(withAlarmScheduler, pkg.name, pkg.version);

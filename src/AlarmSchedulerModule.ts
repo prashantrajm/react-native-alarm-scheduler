@@ -4,14 +4,17 @@ import type {
   AlarmPermissionResponse,
   AlarmAction,
   AlarmContext,
+  AlarmOccurrence,
+  AlarmOccurrenceResolution,
+  AlarmOccurrenceResolutionResult,
   AlarmScheduleInput,
-  ExpoAlarmModuleEvents,
+  AlarmSchedulerModuleEvents,
   NativeAlarmBackupResult,
   NativeAlarmDebugState,
   ScheduledAlarm,
-} from "./ExpoAlarm.types";
+} from "./AlarmScheduler.types";
 
-declare class ExpoAlarmModule extends NativeModule<ExpoAlarmModuleEvents> {
+declare class AlarmSchedulerModule extends NativeModule<AlarmSchedulerModuleEvents> {
   getPermissionsAsync(): Promise<AlarmPermissionResponse>;
   requestPermissionsAsync(): Promise<AlarmPermissionResponse>;
   openAlarmSettingsAsync(): Promise<boolean>;
@@ -25,6 +28,12 @@ declare class ExpoAlarmModule extends NativeModule<ExpoAlarmModuleEvents> {
   getPendingNativeAlarmHandoffAsync(): Promise<AlarmAction | null>;
   clearPendingNativeAlarmHandoffAsync(): Promise<void>;
   completeNativeAlarmAsync(alarmId: string): Promise<void>;
+  resolveAlarmOccurrenceAsync(
+    occurrenceId: string,
+    resolution: AlarmOccurrenceResolution,
+  ): Promise<AlarmOccurrenceResolutionResult>;
+  getAlarmOccurrencesAsync(alarmId?: string): Promise<AlarmOccurrence[]>;
+  cancelAlarmOccurrenceAsync(occurrenceId: string): Promise<boolean>;
   scheduleNativeAlarmBackupAsync(
     alarmId: string,
     delaySeconds?: number,
@@ -39,5 +48,7 @@ declare class ExpoAlarmModule extends NativeModule<ExpoAlarmModuleEvents> {
   openSystemAlarmAppAsync(): Promise<boolean>;
 }
 
-// This call loads the native module object from the JSI.
-export default requireNativeModule<ExpoAlarmModule>("ExpoAlarm");
+export const AlarmScheduler =
+  requireNativeModule<AlarmSchedulerModule>("AlarmScheduler");
+
+export default AlarmScheduler;

@@ -6,11 +6,11 @@
 
 - JS entry: `src/index.ts`
 - Android module: `android/src/main/java/expo/modules/alarm/`
-- iOS module: `ios/ExpoAlarmModule.swift`
+- iOS module: `ios/AlarmSchedulerModule.swift`
 - Config plugin: `app.plugin.js`
 - Example app: `example/`
 
-The public npm package name is `react-native-alarm-scheduler`; the native module name remains `ExpoAlarm`.
+The public npm package name is `react-native-alarm-scheduler`; the native module name is `AlarmScheduler`.
 
 ## Native Boundaries
 
@@ -18,6 +18,15 @@ The public npm package name is `react-native-alarm-scheduler`; the native module
 - Android system Clock integration uses `AlarmClock.ACTION_SET_ALARM` and `AlarmClock.ACTION_SHOW_ALARMS`.
 - iOS scheduling uses AlarmKit only on iOS 26+ with an iOS 26 SDK build.
 - iOS cannot create alarms in the system Clock app through public APIs.
+- Runtime `soundUri` values must point to readable local audio. Scheduling imports the file into
+  durable app-owned storage, so playback does not depend on a picker grant or source cache file.
+- Android preserves the original audio in its private files directory and loops it through the
+  foreground ring service. If Android falls back to a notification channel, it uses the system tone
+  because that channel cannot read the private imported file.
+- iOS transcodes the first 29 seconds into a PCM CAF file under `Library/Sounds` for AlarmKit.
+  DRM-protected subscription tracks cannot be imported because the app cannot read their bytes.
+- iOS Simulator must use the system sound for runtime AlarmKit audio; external sounds can crash
+  SpringBoard inside ToneLibrary. Verify custom iOS playback on a physical iOS 26+ device.
 - Web is unsupported except for explicit unavailable/no-op behavior.
 
 Keep the README capability table honest when changing native behavior.
@@ -81,6 +90,11 @@ iOS validation:
 ```sh
 xcodebuild -quiet -workspace example/ios/mymoduleexample.xcworkspace -scheme mymoduleexample -configuration Debug -sdk iphonesimulator -destination "generic/platform=iOS Simulator" build
 ```
+
+The simulator build validates compilation only for runtime custom sounds. When changing sound
+import or playback behavior, also schedule and hear a picker-selected file on a physical iOS 26+
+device. On Android, verify both exact-alarm registration and custom-file playback on a device or
+emulator; a successful Gradle build alone does not exercise the URI import or ring service.
 
 ## Release Notes
 

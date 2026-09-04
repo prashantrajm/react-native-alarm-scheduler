@@ -10,7 +10,7 @@ import { Callout } from 'fumadocs-ui/components/callout';
 Returns alarm context for app launch or resume routing, or `null`.
 
 ```ts
-const context = await ExpoAlarm.getCurrentAlarmContextAsync();
+const context = await AlarmScheduler.getCurrentAlarmContextAsync();
 ```
 
 ```ts
@@ -19,6 +19,8 @@ type AlarmContext = {
   metadata?: AlarmMetadata;
   state?: 'scheduled' | 'alerting' | 'countdown' | 'paused';
   nativeAlarmId?: string;
+  occurrenceId?: string;
+  relationship?: 'primary' | 'deferred' | 'followUp';
 };
 ```
 
@@ -28,7 +30,8 @@ logical alarm id and `nativeAlarmId` contains the backup UUID. If a one-shot ala
 AlarmKit already removed it from the daemon store, the package can still return the stored metadata
 for a short recovery window.
 
-On **Android** this returns the currently ringing alarm with `state: 'alerting'`, falling back to a
+On **Android** this returns the currently ringing alarm with `state: 'alerting'`, a waiting deferred
+or follow-up occurrence with `state: 'countdown'`, then falls back to a
 one-shot alarm that fired within the last hour and was never completed â€” the same recovery window as
 iOS.
 
@@ -39,10 +42,10 @@ On **web** this returns `null`.
 Returns the latest native handoff recorded by the package, or `null`.
 
 ```ts
-const handoff = await ExpoAlarm.getPendingNativeAlarmHandoffAsync();
+const handoff = await AlarmScheduler.getPendingNativeAlarmHandoffAsync();
 
 if (handoff?.action === 'nativeStop' || handoff?.action === 'secondaryOpen') {
-  await ExpoAlarm.scheduleNativeAlarmBackupAsync(handoff.alarmId, 0.1);
+  await AlarmScheduler.scheduleNativeAlarmBackupAsync(handoff.alarmId, 0.1);
   // route to your alarm handling UI
 }
 ```
@@ -59,7 +62,7 @@ alarm UI without waiting for a JS event.
 Clears the durable native handoff slot. Call it after your app has consumed the handoff.
 
 ```ts
-await ExpoAlarm.clearPendingNativeAlarmHandoffAsync();
+await AlarmScheduler.clearPendingNativeAlarmHandoffAsync();
 ```
 
 <Callout>
@@ -72,7 +75,7 @@ Returns native action records that happened while JS may not have been running â
 on iOS, ringing-service events on Android.
 
 ```ts
-const actions = await ExpoAlarm.getPendingAlarmActionsAsync();
+const actions = await AlarmScheduler.getPendingAlarmActionsAsync();
 ```
 
 ```ts
@@ -110,6 +113,6 @@ Clears pending native action records. Pass action record `id` values to clear sp
 omit `ids` to clear all of them.
 
 ```ts
-await ExpoAlarm.clearPendingAlarmActionsAsync([action.id]);
-await ExpoAlarm.clearPendingAlarmActionsAsync();
+await AlarmScheduler.clearPendingAlarmActionsAsync([action.id]);
+await AlarmScheduler.clearPendingAlarmActionsAsync();
 ```

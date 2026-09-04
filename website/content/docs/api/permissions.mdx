@@ -10,7 +10,7 @@ import { Callout } from 'fumadocs-ui/components/callout';
 Returns the current alarm capability state without prompting.
 
 ```ts
-const permissions = await ExpoAlarm.getPermissionsAsync();
+const permissions = await AlarmScheduler.getPermissionsAsync();
 ```
 
 ```ts
@@ -37,7 +37,7 @@ Requests or opens the native permission surface where possible, then returns the
 `AlarmPermissionResponse`.
 
 ```ts
-const permissions = await ExpoAlarm.requestPermissionsAsync();
+const permissions = await AlarmScheduler.requestPermissionsAsync();
 ```
 
 On Android 12+ this opens the exact alarm settings screen if exact alarms are not currently allowed.
@@ -48,7 +48,7 @@ On iOS 26+ it requests AlarmKit authorization.
 Opens the relevant alarm or app settings screen. Returns whether the open action was started.
 
 ```ts
-const opened = await ExpoAlarm.openAlarmSettingsAsync();
+const opened = await AlarmScheduler.openAlarmSettingsAsync();
 ```
 
 ## `openFullScreenIntentSettingsAsync()`
@@ -56,7 +56,7 @@ const opened = await ExpoAlarm.openAlarmSettingsAsync();
 Android 14+ only. Opens the per-app **Full screen notifications** settings screen.
 
 ```ts
-const opened = await ExpoAlarm.openFullScreenIntentSettingsAsync();
+const opened = await AlarmScheduler.openFullScreenIntentSettingsAsync();
 ```
 
 Returns `false` on older Android versions, on iOS, on web, and when no matching settings activity

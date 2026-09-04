@@ -10,18 +10,18 @@ import { Callout } from 'fumadocs-ui/components/callout';
 Schedules an app-owned native alarm and returns the stored alarm.
 
 ```ts
-const scheduled = await ExpoAlarm.scheduleAlarmAsync({
+const scheduled = await AlarmScheduler.scheduleAlarmAsync({
   id: '00000000-0000-4000-8000-000000000001',
   hour: 7,
   minute: 30,
   title: 'Morning alarm',
   weekdays: [1, 2, 3, 4, 5],
+  soundUri: pickedAudioUri,
   ios: {
     alertTitle: 'Morning alarm',
     secondaryButtonTitle: 'Open',
     stopIntentBehavior: 'rescheduleImmediate',
     secondaryButtonBehavior: 'openApp',
-    soundName: 'bollywood-alarm.mp3',
     metadata: { route: 'alarm-detail' },
   },
   android: {
@@ -42,6 +42,7 @@ type AlarmScheduleInput = {
   weekdays?: AlarmWeekday[];
   timestamp?: number;
   showUi?: boolean;
+  soundUri?: string;
   ios?: IosAlarmOptions;
   android?: AndroidAlarmOptions;
 };
@@ -54,6 +55,7 @@ type AlarmScheduleInput = {
 | `minute` | `0`–`59`. |
 | `weekdays` | ISO numbering: `1` Monday … `7` Sunday. Omit for a one-shot alarm. |
 | `timestamp` | Milliseconds since the Unix epoch. When omitted, the module schedules the next matching `hour`/`minute`. |
+| `soundUri` | Runtime-selected local audio URI. Imported into durable native storage while scheduling. |
 
 ### Returns
 
@@ -75,9 +77,7 @@ type ScheduledAlarm = {
 ```ts
 type AlarmAlertActionMode =
   | 'default'
-  | 'openAppOnly'
-  /** @deprecated Use `openAppOnly`. Still accepted; will be removed in a future major. */
-  | 'openMissionOnly';
+  | 'openAppOnly';
 
 type IosAlarmOptions = {
   metadata?: AlarmMetadata;
@@ -85,16 +85,23 @@ type IosAlarmOptions = {
   alertActionMode?: AlarmAlertActionMode;
   stopButtonTitle?: string;
   secondaryButtonTitle?: string;
+  /** Title shown while a deferred or follow-up timer occurrence is counting down. */
   countdownTitle?: string;
   stopIntentBehavior?: 'recordOnly' | 'openApp' | 'rescheduleImmediate';
   secondaryButtonBehavior?: 'openApp' | 'recordOnly' | 'none';
+  silent?: boolean;
+  soundUri?: string;
   soundName?: string;
 };
 ```
 
 `metadata` is stored by the package and included in AlarmKit metadata; the package always adds
-`alarmId` and `title`. `soundName` maps to `AlertConfiguration.AlertSound.named(soundName)` and must
-be the exact bundled filename including the extension.
+`alarmId` and `title`. `silent` uses the package's bundled silent sound and takes precedence over
+`soundUri` and `soundName`. It is supported on physical iOS 26+ devices; the Simulator rejects it
+instead of falling back to audible audio. `soundUri` is transcoded into `Library/Sounds` and takes
+precedence over `soundName`. `soundName` maps directly to
+`AlertConfiguration.AlertSound.named(soundName)` and must already exist in the app bundle or
+`Library/Sounds`.
 
 See [iOS platform behavior](/platforms/ios#alert-presentation) for what each `stopIntentBehavior` and
 `secondaryButtonBehavior` value actually does.
@@ -111,6 +118,7 @@ type AndroidAlarmOptions = {
   secondaryButtonTitle?: string;
   stopIntentBehavior?: 'recordOnly' | 'openApp' | 'rescheduleImmediate';
   secondaryButtonBehavior?: 'openApp' | 'recordOnly' | 'none';
+  silent?: boolean;
   soundName?: string;
   soundUri?: string;
   vibrate?: boolean;
@@ -128,8 +136,9 @@ type AndroidAlarmOptions = {
 | Field | Default | Notes |
 | --- | --- | --- |
 | `alertBody` | `"Alarm"` | Secondary line on the ringing screen and notification. |
+| `silent` | `false` | Suppress audio and volume enforcement. Vibration remains controlled by `vibrate`. |
 | `soundName` | — | File in `android/app/src/main/res/raw`, extension optional. |
-| `soundUri` | — | Any content or resource URI. Takes precedence over `soundName`. |
+| `soundUri` | — | Runtime local URI. Copied into durable private storage and takes precedence over `soundName`. |
 | `vibrate` | `true` | |
 | `enforceVolume` | `true` | Pins the alarm stream at `volume` and re-raises it when anything lowers it. |
 | `restoreVolume` | `true` | Restore the user's previous alarm volume when the ring ends. |
@@ -142,9 +151,9 @@ type AndroidAlarmOptions = {
 
 <Callout title="Android inherits the iOS options">
 `metadata`, `alertTitle`, `alertActionMode`, `stopButtonTitle`, `secondaryButtonTitle`,
-`stopIntentBehavior`, `secondaryButtonBehavior` and `soundName` fall back to the matching `ios` value
-when omitted. An app written against the AlarmKit flow behaves the same on Android without passing an
-`android` block at all.
+`stopIntentBehavior`, `secondaryButtonBehavior`, `silent`, `soundUri` and `soundName` fall back to
+the matching `ios` value when omitted. An app written against the AlarmKit flow behaves the same on
+Android without passing an `android` block at all.
 </Callout>
 
 ## `cancelAlarmAsync(id)`
@@ -152,7 +161,7 @@ when omitted. An app written against the AlarmKit flow behaves the same on Andro
 Cancels an app-owned alarm by id. Returns `true` when a native or stored alarm was removed.
 
 ```ts
-const removed = await ExpoAlarm.cancelAlarmAsync(alarmId);
+const removed = await AlarmScheduler.cancelAlarmAsync(alarmId);
 ```
 
 ## `getScheduledAlarmsAsync()`
@@ -160,5 +169,5 @@ const removed = await ExpoAlarm.cancelAlarmAsync(alarmId);
 Returns the app-owned alarms stored by this module.
 
 ```ts
-const alarms: ScheduledAlarm[] = await ExpoAlarm.getScheduledAlarmsAsync();
+const alarms: ScheduledAlarm[] = await AlarmScheduler.getScheduledAlarmsAsync();
 ```

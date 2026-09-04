@@ -40,6 +40,7 @@ type AlarmWeekday = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 type AlarmMetadataValue = string | number | boolean;
 type AlarmMetadata = Record<string, AlarmMetadataValue>;
+type AlarmOccurrenceRelationship = 'primary' | 'deferred' | 'followUp';
 
 type AlarmScheduleInput = {
   id?: string;
@@ -49,12 +50,15 @@ type AlarmScheduleInput = {
   weekdays?: AlarmWeekday[];
   timestamp?: number;
   showUi?: boolean;
+  soundUri?: string;
   ios?: IosAlarmOptions;
   android?: AndroidAlarmOptions;
 };
 
 type ScheduledAlarm = {
   id: string;
+  occurrenceId?: string;
+  relationship?: AlarmOccurrenceRelationship;
   hour: number;
   minute: number;
   title: string;
@@ -65,14 +69,46 @@ type ScheduledAlarm = {
 };
 ```
 
+## Occurrences
+
+```ts
+type AlarmOccurrencePhase = 'scheduled' | 'ringing' | 'completed' | 'cancelled';
+
+type AlarmOccurrence = {
+  occurrenceId: string;
+  alarmId: string;
+  parentOccurrenceId?: string;
+  scheduledFor: number;
+  relationship: AlarmOccurrenceRelationship;
+  phase: AlarmOccurrencePhase;
+  metadata?: AlarmMetadata;
+};
+
+type AlarmOccurrenceResolution = {
+  outcome: 'completed' | 'deferred';
+  next?: {
+    delaySeconds: number;
+    relationship: 'deferred' | 'followUp';
+    metadata?: AlarmMetadata;
+  };
+  idempotencyKey?: string;
+};
+
+type AlarmOccurrenceResolutionResult = {
+  alarmId: string;
+  resolvedOccurrenceId: string;
+  outcome: 'completed' | 'deferred';
+  status: 'resolved' | 'resolvedWithoutNext';
+  nextOccurrence?: AlarmOccurrence;
+};
+```
+
 ## Platform options
 
 ```ts
 type AlarmAlertActionMode =
   | 'default'
-  | 'openAppOnly'
-  /** @deprecated Use `openAppOnly`. Still accepted; will be removed in a future major. */
-  | 'openMissionOnly';
+  | 'openAppOnly';
 
 type IosAlarmOptions = {
   metadata?: AlarmMetadata;
@@ -80,9 +116,12 @@ type IosAlarmOptions = {
   alertActionMode?: AlarmAlertActionMode;
   stopButtonTitle?: string;
   secondaryButtonTitle?: string;
+  /** Title shown while a deferred or follow-up timer occurrence is counting down. */
   countdownTitle?: string;
   stopIntentBehavior?: 'recordOnly' | 'openApp' | 'rescheduleImmediate';
   secondaryButtonBehavior?: 'openApp' | 'recordOnly' | 'none';
+  silent?: boolean;
+  soundUri?: string;
   soundName?: string;
 };
 
@@ -95,6 +134,7 @@ type AndroidAlarmOptions = {
   secondaryButtonTitle?: string;
   stopIntentBehavior?: 'recordOnly' | 'openApp' | 'rescheduleImmediate';
   secondaryButtonBehavior?: 'openApp' | 'recordOnly' | 'none';
+  silent?: boolean;
   soundName?: string;
   soundUri?: string;
   vibrate?: boolean;
@@ -119,6 +159,8 @@ type AlarmContext = {
   metadata?: AlarmMetadata;
   state?: AlarmContextState;
   nativeAlarmId?: string;
+  occurrenceId?: string;
+  relationship?: AlarmOccurrenceRelationship;
 };
 
 type AlarmActionType = 'nativeStop' | 'secondaryOpen' | 'snooze' | 'dismiss';
@@ -143,6 +185,8 @@ type AlarmAction = {
 
 type AlarmStateChange = {
   id: string;
+  occurrenceId?: string;
+  relationship?: AlarmOccurrenceRelationship;
   state: AlarmContextState;
   timestamp: number;
   metadata?: AlarmMetadata;
@@ -168,7 +212,6 @@ type NativeAlarmDebugState = {
   pendingHandoff?: AlarmAction | null;
   intentDebugCounts?: Record<string, number>;
   currentContext: AlarmContext | null;
-  // always canonical, even when scheduled with the legacy `openMissionOnly`
   alertActionMode?: 'default' | 'openAppOnly';
   stopButtonIncluded?: boolean;
   secondaryButtonIncluded?: boolean;
@@ -176,8 +219,10 @@ type NativeAlarmDebugState = {
   stopIntentBehavior?: 'recordOnly' | 'openApp' | 'rescheduleImmediate';
   alertInitializer?: 'secondaryOnly' | 'legacyStopButton' | 'androidRingService';
   runtimeSupportsSecondaryOnlyAlert?: boolean;
-  sound?: 'default' | 'named';
+  sound?: 'default' | 'named' | 'silent';
   soundName?: string;
+  soundFallbackReason?: 'iosSimulatorCustomSoundUnsupported';
+  soundUri?: string;
   isRinging?: boolean;
   isScheduled?: boolean;
   canUseFullScreenIntent?: boolean;
@@ -188,7 +233,7 @@ type NativeAlarmDebugState = {
 ## Events
 
 ```ts
-type ExpoAlarmModuleEvents = {
+type AlarmSchedulerModuleEvents = {
   onAlarmTriggered: (alarm: ScheduledAlarm) => void;
   onAlarmAction: (action: AlarmAction) => void;
   onAlarmStateChange: (event: AlarmStateChange) => void;

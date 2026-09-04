@@ -17,9 +17,9 @@ Notification libraries schedule a notification and hope the device is awake to s
 schedules an actual alarm.
 
 ```ts
-import ExpoAlarm from 'react-native-alarm-scheduler';
+import AlarmScheduler from 'react-native-alarm-scheduler';
 
-await ExpoAlarm.scheduleAlarmAsync({
+await AlarmScheduler.scheduleAlarmAsync({
   hour: 7,
   minute: 30,
   title: 'Morning alarm',
@@ -37,7 +37,8 @@ await ExpoAlarm.scheduleAlarmAsync({
 - **Survives reboots**, app updates, and clock or timezone changes.
 - **Cold-launch handoff records** written natively before any JS runs, so your app always knows why
   it opened.
-- **Custom alarm sounds** on both platforms, bundled by the config plugin.
+- **User-selected alarm sounds** from runtime picker URIs, with a different local file per alarm.
+- **Silent alarms** that preserve native presentation and optional vibration without playing audio.
 - **System Clock integration** on Android via `ACTION_SET_ALARM` and `ACTION_SHOW_ALARMS`.
 - **Expo config plugin** for permissions and `NSAlarmKitUsageDescription`.
 - **Fully typed**, with explicit unavailable behavior where the OS cannot schedule alarms.
@@ -48,7 +49,8 @@ await ExpoAlarm.scheduleAlarmAsync({
 | --- | :---: | :---: |
 | Schedule, list and cancel app-owned alarms | ✅ | ✅ |
 | Permissions and settings surfaces | ✅ | ✅ |
-| Custom alarm sound | ✅ | ✅ |
+| Custom alarm sound | ✅ | ✅ physical device; system default in Simulator |
+| Silent alarm | ✅ | ✅ physical device; rejected in Simulator |
 | Ring until the app says stop (`openAppOnly`) | ✅ | ⚠️ |
 | Cold-launch handoff, action records, backup alarms | ✅ | ✅ |
 | Survive reboot | ✅ | ✅ |

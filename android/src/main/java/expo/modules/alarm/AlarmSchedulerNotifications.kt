@@ -19,14 +19,14 @@ import android.os.Build
  * otherwise the alarm would play twice from two places, only one of which can be stopped. The
  * fallback has no service and therefore no MediaPlayer, so its channel carries the alarm sound.
  */
-internal object ExpoAlarmNotifications {
+internal object AlarmSchedulerNotifications {
   const val RING_NOTIFICATION_ID = 0xA1A2
   const val FALLBACK_NOTIFICATION_ID = 0xA1A3
 
-  private const val CHANNEL_RING = "expo_alarm_ring"
-  private const val CHANNEL_FALLBACK = "expo_alarm_fallback"
+  private const val CHANNEL_RING = "alarm_scheduler_ring"
+  private const val CHANNEL_FALLBACK = "alarm_scheduler_fallback"
 
-  fun buildRingNotification(context: Context, alarmId: String, options: ExpoAlarmOptions): Notification {
+  fun buildRingNotification(context: Context, alarmId: String, options: AlarmSchedulerOptions): Notification {
     createRingChannel(context)
     return build(context, alarmId, options, CHANNEL_RING, ongoing = true)
   }
@@ -36,9 +36,9 @@ internal object ExpoAlarmNotifications {
    * exact-alarm grant, or any other denial. Rings through the notification channel instead of the
    * service so the user is still woken, as loudly as the platform allows without a service.
    */
-  fun postFallbackNotification(context: Context, alarmId: String, options: ExpoAlarmOptions) {
-    createFallbackChannel(context, options)
-    val notification = build(context, alarmId, options, CHANNEL_FALLBACK, ongoing = false)
+  fun postFallbackNotification(context: Context, alarmId: String, options: AlarmSchedulerOptions) {
+    val channelId = createFallbackChannel(context, options)
+    val notification = build(context, alarmId, options, channelId, ongoing = false)
     val manager = context.getSystemService(NotificationManager::class.java) ?: return
     runCatching { manager.notify(FALLBACK_NOTIFICATION_ID, notification) }
   }
@@ -46,7 +46,7 @@ internal object ExpoAlarmNotifications {
   private fun build(
     context: Context,
     alarmId: String,
-    options: ExpoAlarmOptions,
+    options: AlarmSchedulerOptions,
     channelId: String,
     ongoing: Boolean
   ): Notification {
@@ -71,13 +71,17 @@ internal object ExpoAlarmNotifications {
     if (options.fullScreen) {
       builder.setFullScreenIntent(contentIntent, true)
     }
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O && !ongoing) {
+      @Suppress("DEPRECATION")
+      builder.setSound(fallbackSoundUri(context, options))
+    }
 
     builder.addAction(
-      action(options.secondaryButtonTitle, servicePendingIntent(context, ExpoAlarmRingService.ACTION_OPEN, alarmId, "open"))
+      action(options.secondaryButtonTitle, servicePendingIntent(context, AlarmSchedulerRingService.ACTION_OPEN, alarmId, "open"))
     )
     if (options.alertActionMode != ALERT_ACTION_MODE_OPEN_APP_ONLY) {
       builder.addAction(
-        action(options.stopButtonTitle, servicePendingIntent(context, ExpoAlarmRingService.ACTION_STOP, alarmId, "stop"))
+        action(options.stopButtonTitle, servicePendingIntent(context, AlarmSchedulerRingService.ACTION_STOP, alarmId, "stop"))
       )
     }
 
@@ -109,14 +113,16 @@ internal object ExpoAlarmNotifications {
     )
   }
 
-  private fun createFallbackChannel(context: Context, options: ExpoAlarmOptions) {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-      return
-    }
-    val manager = context.getSystemService(NotificationManager::class.java) ?: return
+  private fun createFallbackChannel(context: Context, options: AlarmSchedulerOptions): String {
     val sound = fallbackSoundUri(context, options)
+    val vibrationKey = if (options.vibrate) "vibrate" else "no_vibration"
+    val channelId = "${CHANNEL_FALLBACK}_${sound.toString().hashCode().toUInt().toString(16)}_$vibrationKey"
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+      return channelId
+    }
+    val manager = context.getSystemService(NotificationManager::class.java) ?: return channelId
     manager.createNotificationChannel(
-      NotificationChannel(CHANNEL_FALLBACK, "Alarms (fallback)", NotificationManager.IMPORTANCE_HIGH).apply {
+      NotificationChannel(channelId, "Alarms (fallback)", NotificationManager.IMPORTANCE_HIGH).apply {
         setSound(
           sound,
           AudioAttributes.Builder()
@@ -130,10 +136,16 @@ internal object ExpoAlarmNotifications {
         setShowBadge(false)
       }
     )
+    return channelId
   }
 
-  private fun fallbackSoundUri(context: Context, options: ExpoAlarmOptions): Uri? {
-    options.soundUri?.let { raw -> runCatching { Uri.parse(raw) }.getOrNull()?.let { return it } }
+  private fun fallbackSoundUri(context: Context, options: AlarmSchedulerOptions): Uri? {
+    if (options.silent) {
+      return null
+    }
+    options.soundUri?.let { raw ->
+      runCatching { Uri.parse(raw) }.getOrNull()?.takeUnless { it.scheme == "file" }?.let { return it }
+    }
     options.soundName?.let { name ->
       val resourceId = context.resources.getIdentifier(name.substringBeforeLast('.'), "raw", context.packageName)
       if (resourceId != 0) {
@@ -144,37 +156,37 @@ internal object ExpoAlarmNotifications {
   }
 
   fun servicePendingIntent(context: Context, action: String, alarmId: String, suffix: String): PendingIntent {
-    val intent = Intent(context, ExpoAlarmRingService::class.java).apply {
+    val intent = Intent(context, AlarmSchedulerRingService::class.java).apply {
       this.action = action
-      putExtra(ExpoAlarmRingService.EXTRA_ALARM_ID, alarmId)
+      putExtra(AlarmSchedulerRingService.EXTRA_ALARM_ID, alarmId)
     }
     return PendingIntent.getService(
       context,
-      ExpoAlarmScheduler.requestCode("$suffix-$alarmId"),
+      AlarmSchedulerScheduler.requestCode("$suffix-$alarmId"),
       intent,
-      ExpoAlarmScheduler.pendingFlags()
+      AlarmSchedulerScheduler.pendingFlags()
     )
   }
 
-  fun fullScreenPendingIntent(context: Context, alarmId: String, options: ExpoAlarmOptions): PendingIntent {
+  fun fullScreenPendingIntent(context: Context, alarmId: String, options: AlarmSchedulerOptions): PendingIntent {
     if (options.fullScreenTarget == FULL_SCREEN_TARGET_APP) {
       return PendingIntent.getActivity(
         context,
-        ExpoAlarmScheduler.requestCode("app-$alarmId"),
+        AlarmSchedulerScheduler.requestCode("app-$alarmId"),
         appIntent(context, alarmId, options) ?: Intent(),
-        ExpoAlarmScheduler.pendingFlags()
+        AlarmSchedulerScheduler.pendingFlags()
       )
     }
     return PendingIntent.getActivity(
       context,
-      ExpoAlarmScheduler.requestCode("ring-$alarmId"),
-      ExpoAlarmRingActivity.intent(context, alarmId),
-      ExpoAlarmScheduler.pendingFlags()
+      AlarmSchedulerScheduler.requestCode("ring-$alarmId"),
+      AlarmSchedulerRingActivity.intent(context, alarmId),
+      AlarmSchedulerScheduler.pendingFlags()
     )
   }
 
-  fun appIntent(context: Context, alarmId: String, options: ExpoAlarmOptions): Intent? {
-    val intent = ExpoAlarmScheduler.launchIntent(context) ?: return null
+  fun appIntent(context: Context, alarmId: String, options: AlarmSchedulerOptions): Intent? {
+    val intent = AlarmSchedulerScheduler.launchIntent(context) ?: return null
     options.launchUri?.let { template ->
       val uri = if (template.contains(ALARM_ID_PLACEHOLDER)) {
         template.replace(ALARM_ID_PLACEHOLDER, Uri.encode(alarmId))
@@ -185,7 +197,7 @@ internal object ExpoAlarmNotifications {
       intent.data = runCatching { Uri.parse(uri) }.getOrNull()
     }
     return intent
-      .putExtra(ExpoAlarmRingService.EXTRA_ALARM_ID, alarmId)
+      .putExtra(AlarmSchedulerRingService.EXTRA_ALARM_ID, alarmId)
       .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
   }
 

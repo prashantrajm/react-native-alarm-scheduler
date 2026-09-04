@@ -28,9 +28,9 @@ import java.util.Locale
  * button that hands off to the app. The UI is built in code so the library ships no resources and
  * inherits no theme from the host app.
  */
-class ExpoAlarmRingActivity : Activity() {
+class AlarmSchedulerRingActivity : Activity() {
   private var alarmId: String? = null
-  private var options: ExpoAlarmOptions? = null
+  private var options: AlarmSchedulerOptions? = null
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -52,14 +52,14 @@ class ExpoAlarmRingActivity : Activity() {
   }
 
   private fun bind(intent: Intent) {
-    val id = intent.getStringExtra(ExpoAlarmRingService.EXTRA_ALARM_ID)
-    val stored = id?.let { ExpoAlarmStore.alarm(this, it) }
+    val id = intent.getStringExtra(AlarmSchedulerRingService.EXTRA_ALARM_ID)
+    val stored = id?.let { AlarmSchedulerStore.alarm(this, it) }
     if (id == null || stored == null) {
       finish()
       return
     }
     alarmId = id
-    options = ExpoAlarmOptions.fromJson(
+    options = AlarmSchedulerOptions.fromJson(
       stored.optJSONObject("options"),
       stored.optString("title", "Alarm"),
       id
@@ -172,9 +172,9 @@ class ExpoAlarmRingActivity : Activity() {
     val id = alarmId ?: return
     // The service keeps ringing: only the app's own completeNativeAlarmAsync() call ends it.
     startService(
-      Intent(this, ExpoAlarmRingService::class.java).apply {
-        action = ExpoAlarmRingService.ACTION_OPEN
-        putExtra(ExpoAlarmRingService.EXTRA_ALARM_ID, id)
+      Intent(this, AlarmSchedulerRingService::class.java).apply {
+        action = AlarmSchedulerRingService.ACTION_OPEN
+        putExtra(AlarmSchedulerRingService.EXTRA_ALARM_ID, id)
       }
     )
     finish()
@@ -183,9 +183,9 @@ class ExpoAlarmRingActivity : Activity() {
   private fun stopAlarm() {
     val id = alarmId ?: return
     startService(
-      Intent(this, ExpoAlarmRingService::class.java).apply {
-        action = ExpoAlarmRingService.ACTION_STOP
-        putExtra(ExpoAlarmRingService.EXTRA_ALARM_ID, id)
+      Intent(this, AlarmSchedulerRingService::class.java).apply {
+        action = AlarmSchedulerRingService.ACTION_STOP
+        putExtra(AlarmSchedulerRingService.EXTRA_ALARM_ID, id)
       }
     )
     finish()
@@ -195,10 +195,10 @@ class ExpoAlarmRingActivity : Activity() {
 
   companion object {
     fun intent(context: Context, alarmId: String): Intent {
-      return Intent(context, ExpoAlarmRingActivity::class.java).apply {
+      return Intent(context, AlarmSchedulerRingActivity::class.java).apply {
         action = Intent.ACTION_MAIN
-        data = android.net.Uri.parse("expo-alarm-ring://$alarmId")
-        putExtra(ExpoAlarmRingService.EXTRA_ALARM_ID, alarmId)
+        data = android.net.Uri.parse("alarm-scheduler-ring://$alarmId")
+        putExtra(AlarmSchedulerRingService.EXTRA_ALARM_ID, alarmId)
         addFlags(
           Intent.FLAG_ACTIVITY_NEW_TASK or
             Intent.FLAG_ACTIVITY_SINGLE_TOP or

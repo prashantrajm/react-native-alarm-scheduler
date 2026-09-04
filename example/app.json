@@ -2,6 +2,7 @@
   "expo": {
     "name": "react-native-alarm-scheduler-example",
     "slug": "react-native-alarm-scheduler-example",
+    "scheme": "alarm-scheduler-example",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

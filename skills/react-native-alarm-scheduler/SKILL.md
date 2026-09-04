@@ -23,14 +23,14 @@ Full docs: <https://react-native-alarm-scheduler.vercel.app/llms.txt>
 { "expo": { "plugins": [["react-native-alarm-scheduler", { "alarmKitUsageDescription": "…" }]] } }
 ```
 
-## The five rules that cause most bugs
+## The six rules that cause most bugs
 
 **1. Gate every schedule on `canScheduleExactAlarms`.** On Android this is not a nicety: without the
 exact-alarm grant the ringing foreground service cannot legally start, so the alarm degrades to a
 notification. Never call `scheduleAlarmAsync` without checking.
 
 ```ts
-const p = await ExpoAlarm.requestPermissionsAsync();
+const p = await AlarmScheduler.requestPermissionsAsync();
 if (!p.canScheduleExactAlarms) return; // route the user to settings, explain why
 ```
 
@@ -39,12 +39,12 @@ when a JS runtime is alive — which is usually false for a 7am alarm. Everythin
 natively. Reconcile on **every launch and every foreground**:
 
 ```ts
-const handoff = await ExpoAlarm.getPendingNativeAlarmHandoffAsync();
-const context = handoff ? null : await ExpoAlarm.getCurrentAlarmContextAsync();
+const handoff = await AlarmScheduler.getPendingNativeAlarmHandoffAsync();
+const context = handoff ? null : await AlarmScheduler.getCurrentAlarmContextAsync();
 const alarmId = handoff?.alarmId ?? context?.id;
 if (alarmId) {
   router.replace(`/alarm/${alarmId}`);
-  await ExpoAlarm.clearPendingNativeAlarmHandoffAsync();
+  await AlarmScheduler.clearPendingNativeAlarmHandoffAsync();
 }
 ```
 
@@ -54,9 +54,9 @@ Writing alarm routing *only* inside an event listener is the single most common 
 can share ids.
 
 **4. Android inherits the `ios` options.** `metadata`, `alertTitle`, `alertActionMode`,
-`stopButtonTitle`, `secondaryButtonTitle`, `stopIntentBehavior`, `secondaryButtonBehavior` and
-`soundName` fall back to the `ios` value when omitted. Do not duplicate them into `android` — set
-`android` fields only where the platforms should genuinely differ (`launchUri`, `soundUri`,
+`stopButtonTitle`, `secondaryButtonTitle`, `stopIntentBehavior`, `secondaryButtonBehavior`, `silent`,
+`soundUri` and `soundName` fall back to the `ios` value when omitted. Do not duplicate them into
+`android` — set `android` fields only where the platforms should genuinely differ (`launchUri`,
 `maxRingDurationSeconds`, volume behavior).
 
 **5. `completeNativeAlarmAsync(alarmId)` is mandatory, not advisory.** With
@@ -64,14 +64,47 @@ can share ids.
 only after the user actually satisfies the completion condition, then `cancelAlarmAsync` and
 reschedule if the alarm repeats.
 
-## Completion-gated alarms
+**6. Runtime sounds must be readable local files.** Pass a picker result as the top-level
+`soundUri`; the module copies it into durable native storage during `scheduleAlarmAsync`. On iOS it
+transcodes the first 29 seconds to a PCM CAF for AlarmKit. DRM-protected Apple Music or Spotify
+tracks cannot be imported because the app never receives their audio bytes. iOS Simulator uses the
+system default sound because its ToneLibrary can crash SpringBoard for external AlarmKit sounds;
+verify custom iOS playback on a physical device.
 
-An alarm that keeps ringing until the app confirms the user finished something. `openAppOnly` was
-previously called `openMissionOnly`; the old spelling is still accepted, but write new code with
-`openAppOnly`.
+**7. Use `silent`, not a zero-volume workaround.** `silent: true` overrides `soundUri` and
+`soundName`. Android skips playback and volume enforcement while leaving `vibrate` independent. On
+physical iOS 26+ devices the config plugin's bundled silent CAF preserves the AlarmKit presentation;
+the Simulator rejects silent scheduling, and a missing bundled asset fails scheduling rather than
+falling back to the audible system sound.
+
+## Deferred and follow-up occurrences
+
+Use `resolveAlarmOccurrenceAsync` when an active alarm should stop and optionally produce another
+delivery. Do not reproduce the native stop, completion reset, definition restoration, and timer
+ordering in application code.
 
 ```ts
-await ExpoAlarm.scheduleAlarmAsync({
+await AlarmScheduler.resolveAlarmOccurrenceAsync(occurrenceId, {
+  outcome: 'deferred',
+  next: {
+    delaySeconds: 5 * 60,
+    relationship: 'deferred',
+  },
+  idempotencyKey: `defer:${occurrenceId}:1`,
+});
+```
+
+Use the returned `occurrenceId` with `cancelAlarmOccurrenceAsync`; do not cancel every backup for the
+alarm when only one occurrence should be removed. Reconcile persisted state with
+`getAlarmOccurrencesAsync()` after cold launch.
+
+## Completion-gated alarms
+
+An alarm that keeps ringing until the app confirms the user finished something. Use
+`alertActionMode: 'openAppOnly'` to remove the native stop action.
+
+```ts
+await AlarmScheduler.scheduleAlarmAsync({
   id: uuid,
   hour: 7,
   minute: 0,

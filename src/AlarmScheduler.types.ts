@@ -20,7 +20,7 @@ export type AlarmPermissionResponse = {
   canPostNotifications?: boolean;
 };
 
-export type ExpoAlarmModuleEvents = {
+export type AlarmSchedulerModuleEvents = {
   onAlarmTriggered: (alarm: ScheduledAlarm) => void;
   onAlarmAction: (action: AlarmAction) => void;
   onAlarmStateChange: (event: AlarmStateChange) => void;
@@ -38,15 +38,9 @@ export type AlarmMetadata = Record<string, AlarmMetadataValue>;
  * `default` shows a stop button. `openAppOnly` removes it, leaving a single button that opens
  * your app while the alarm keeps ringing; only `completeNativeAlarmAsync()` ends the ring.
  *
- * `openMissionOnly` is the former name of `openAppOnly` and is still accepted.
- *
  * @see https://react-native-alarm-scheduler.vercel.app/guides/completion-gating
  */
-export type AlarmAlertActionMode =
-  | "default"
-  | "openAppOnly"
-  /** @deprecated Use `openAppOnly`. Still accepted; will be removed in a future major. */
-  | "openMissionOnly";
+export type AlarmAlertActionMode = "default" | "openAppOnly";
 
 export type IosAlarmOptions = {
   metadata?: AlarmMetadata;
@@ -54,10 +48,16 @@ export type IosAlarmOptions = {
   alertActionMode?: AlarmAlertActionMode;
   stopButtonTitle?: string;
   secondaryButtonTitle?: string;
+  /** Title shown while a deferred or follow-up timer occurrence is counting down. */
   countdownTitle?: string;
   stopIntentBehavior?: "recordOnly" | "openApp" | "rescheduleImmediate";
   secondaryButtonBehavior?: "openApp" | "recordOnly" | "none";
+  /** Runtime audio file URI. Overrides `soundName` and is copied into `Library/Sounds`. */
+  soundUri?: string;
+  /** Name of a sound already bundled in the app or present in `Library/Sounds`. */
   soundName?: string;
+  /** Use the package's bundled silent tone. Overrides `soundUri` and `soundName`. */
+  silent?: boolean;
 };
 
 /**
@@ -86,8 +86,10 @@ export type AndroidAlarmOptions = {
   secondaryButtonBehavior?: "openApp" | "recordOnly" | "none";
   /** Name of a file in `android/app/src/main/res/raw` (extension optional). */
   soundName?: string;
-  /** Any content/resource URI. Takes precedence over `soundName`. */
+  /** Runtime audio file URI. Takes precedence over `soundName` and is copied for durable access. */
   soundUri?: string;
+  /** Suppress audio playback while preserving vibration and alarm presentation. Defaults to `false`. */
+  silent?: boolean;
   /** Defaults to `true`. */
   vibrate?: boolean;
   /**
@@ -150,12 +152,19 @@ export type AlarmScheduleInput = {
   weekdays?: AlarmWeekday[];
   timestamp?: number;
   showUi?: boolean;
+  /**
+   * Runtime-selected local audio file URI. The native module copies it into durable app storage
+   * while scheduling so the alarm can play after the picker grant or cache file expires.
+   */
+  soundUri?: string;
   ios?: IosAlarmOptions;
   android?: AndroidAlarmOptions;
 };
 
 export type ScheduledAlarm = {
   id: string;
+  occurrenceId?: string;
+  relationship?: AlarmOccurrenceRelationship;
   hour: number;
   minute: number;
   title: string;
@@ -176,10 +185,54 @@ export type AlarmContext = {
   metadata?: AlarmMetadata;
   state?: AlarmContextState;
   nativeAlarmId?: string;
+  /** The concrete scheduled instance. Equal to `id` for a primary occurrence. */
+  occurrenceId?: string;
+  relationship?: AlarmOccurrenceRelationship;
+};
+
+/** How a scheduled occurrence relates to the alarm definition that created it. */
+export type AlarmOccurrenceRelationship = "primary" | "deferred" | "followUp";
+
+export type AlarmOccurrencePhase =
+  | "scheduled"
+  | "ringing"
+  | "completed"
+  | "cancelled";
+
+/** A concrete native delivery of a durable alarm definition. */
+export type AlarmOccurrence = {
+  occurrenceId: string;
+  alarmId: string;
+  parentOccurrenceId?: string;
+  scheduledFor: number;
+  relationship: AlarmOccurrenceRelationship;
+  phase: AlarmOccurrencePhase;
+  metadata?: AlarmMetadata;
+};
+
+export type AlarmOccurrenceResolution = {
+  outcome: "completed" | "deferred";
+  next?: {
+    delaySeconds: number;
+    relationship: "deferred" | "followUp";
+    metadata?: AlarmMetadata;
+  };
+  /** Makes retries return the first result instead of scheduling another occurrence. */
+  idempotencyKey?: string;
+};
+
+export type AlarmOccurrenceResolutionResult = {
+  alarmId: string;
+  resolvedOccurrenceId: string;
+  outcome: "completed" | "deferred";
+  status: "resolved" | "resolvedWithoutNext";
+  nextOccurrence?: AlarmOccurrence;
 };
 
 export type AlarmStateChange = {
   id: string;
+  occurrenceId?: string;
+  relationship?: AlarmOccurrenceRelationship;
   state: AlarmContextState;
   timestamp: number;
   metadata?: AlarmMetadata;
@@ -193,7 +246,6 @@ export type NativeAlarmDebugState = {
   pendingHandoff?: AlarmAction | null;
   intentDebugCounts?: Record<string, number>;
   currentContext: AlarmContext | null;
-  /** Always reported in canonical form, even when scheduled with the legacy `openMissionOnly`. */
   alertActionMode?: "default" | "openAppOnly";
   stopButtonIncluded?: boolean;
   secondaryButtonIncluded?: boolean;
@@ -204,8 +256,12 @@ export type NativeAlarmDebugState = {
     | "legacyStopButton"
     | "androidRingService";
   runtimeSupportsSecondaryOnlyAlert?: boolean;
-  sound?: "default" | "named";
+  sound?: "default" | "named" | "silent";
   soundName?: string;
+  /** Explains why a requested custom sound was replaced with the system default. */
+  soundFallbackReason?: "iosSimulatorCustomSoundUnsupported";
+  /** Android durable URI used by the native ring service for a runtime-selected sound. */
+  soundUri?: string;
   /** Android: the ring service is currently playing this alarm. */
   isRinging?: boolean;
   /** Android: the alarm is still present in the native store. */

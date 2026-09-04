@@ -7,13 +7,14 @@
   "files": [
     "CHANGELOG.md",
     "README.md",
+    "assets",
     "android/build.gradle",
     "android/src",
     "app.plugin.js",
     "build",
     "expo-module.config.json",
-    "ios/ExpoAlarm.podspec",
-    "ios/ExpoAlarmModule.swift",
+    "ios/AlarmScheduler.podspec",
+    "ios/AlarmScheduler",
     "skills",
     "src"
   ],
@@ -23,6 +24,7 @@
     "lint": "expo-module lint",
     "test": "expo-module test",
     "prepare": "expo-module prepare",
+    "prepack": "node scripts/verify-silent-sound.mjs",
     "prepublishOnly": "expo-module prepublishOnly",
     "expo-module": "expo-module",
     "open:ios": "xed example/ios",
@@ -34,7 +36,7 @@
     "alarm",
     "alarmkit",
     "android-alarmmanager",
-    "ExpoAlarm"
+    "AlarmScheduler"
   ],
   "repository": {
     "type": "git",
