@@ -13,7 +13,7 @@
     "build",
     "expo-module.config.json",
     "ios/AlarmScheduler.podspec",
-    "ios/AlarmSchedulerModule.swift",
+    "ios/AlarmScheduler",
     "skills",
     "src"
   ],

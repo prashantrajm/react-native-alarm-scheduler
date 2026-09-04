@@ -7,6 +7,42 @@
   the GitHub Release fall back to "See CHANGELOG.md for details."
 -->
 
+## 1.0.0
+
+This major release gives the package a platform-neutral module identity and lets users choose alarm
+audio at runtime. Existing build-time bundled sounds and the system default remain supported.
+
+### 🛠 Breaking changes
+
+- Rename the JavaScript and native module from `ExpoAlarm` to **`AlarmScheduler`**. Import the
+  package with `import AlarmScheduler from 'react-native-alarm-scheduler'`; a named
+  `AlarmScheduler` export is also available.
+- Rename the native registration, Android classes and components, iOS module and podspec to
+  `AlarmScheduler`. Apps upgrading to 1.0.0 must install dependencies and perform a full native
+  rebuild. Code that directly requires the old native module name must migrate to `AlarmScheduler`.
+
+### 🎉 New features
+
+- Add `soundUri` to the shared schedule input and the `ios` and `android` option objects, allowing an
+  alarm to use audio selected or downloaded while the app is running.
+- Copy Android picker-backed audio into app-owned storage before scheduling, so playback does not
+  depend on a temporary document-provider permission. The foreground ring service loops the stored
+  file when the alarm fires.
+- Import iOS runtime audio into the app's `Library/Sounds` directory and transcode the first 29
+  seconds to an AlarmKit-compatible CAF file. Runtime custom sounds are used on physical devices;
+  the iOS Simulator falls back to the system sound because external AlarmKit sounds are not reliable
+  there.
+- Expose the resolved runtime `soundUri` and any custom-sound fallback reason through
+  `getNativeAlarmDebugStateAsync()`.
+
+### 💡 Others
+
+- Keep `soundName` and config-plugin bundled sounds available for alarms whose audio is known at
+  build time.
+- Add an audio document picker to the example app for testing runtime custom sounds.
+- Update the README, documentation site and packaged agent skill for the new module name and sound
+  workflow.
+
 ## 0.3.0
 
 Naming and documentation. No scheduling, ringing or completion logic changed.
