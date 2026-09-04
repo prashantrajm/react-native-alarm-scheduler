@@ -1,7 +1,7 @@
 # react-native-alarm-scheduler
 
 [![npm version](https://img.shields.io/npm/v/react-native-alarm-scheduler.svg)](https://www.npmjs.com/package/react-native-alarm-scheduler)
-[![license](https://img.shields.io/npm/l/react-native-alarm-scheduler.svg)](https://github.com/rajmauryafr/react-native-alarm-scheduler/blob/main/LICENSE)
+[![license](https://img.shields.io/npm/l/react-native-alarm-scheduler.svg)](https://github.com/prashantrajm/react-native-alarm-scheduler/blob/main/LICENSE)
 ![platforms](https://img.shields.io/badge/platforms-android%20%7C%20ios-lightgrey)
 
 Real, user-visible alarms for React Native and Expo — AlarmKit on iOS, an equivalent on Android.
@@ -35,7 +35,7 @@ schedules an actual alarm.
 
 - **[API reference](https://react-native-alarm-scheduler.vercel.app/api)** — every method, type, and event.
 - **[Platform behavior](https://react-native-alarm-scheduler.vercel.app/platforms/android)** — Android ringing internals and iOS AlarmKit limits.
-- **[Example app](https://github.com/rajmauryafr/react-native-alarm-scheduler/tree/main/example)** — a runnable Expo app exercising the full API.
+- **[Example app](https://github.com/prashantrajm/react-native-alarm-scheduler/tree/main/example)** — a runnable Expo app exercising the full API.
 - **[For AI agents](https://react-native-alarm-scheduler.vercel.app/ai)** — [`llms.txt`](https://react-native-alarm-scheduler.vercel.app/llms.txt), raw markdown per page, and a bundled agent skill.
 
 ## Requirements

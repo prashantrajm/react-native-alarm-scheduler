@@ -98,5 +98,5 @@ emulator; a successful Gradle build alone does not exercise the URI import or ri
 
 ## Release Notes
 
-- Package metadata must point to `https://github.com/rajmauryafr/react-native-alarm-scheduler`.
+- Package metadata must point to `https://github.com/prashantrajm/react-native-alarm-scheduler`.
 - After publishing a new version, verify with `npm view react-native-alarm-scheduler version`.

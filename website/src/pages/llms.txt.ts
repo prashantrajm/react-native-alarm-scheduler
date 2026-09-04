@@ -31,7 +31,7 @@ export const GET: APIRoute = ({ site }) => {
     '## Optional',
     '',
     `- [Full documentation as one file](${absolute(site, '/llms-full.txt')})`,
-    '- [Source repository](https://github.com/rajmauryafr/react-native-alarm-scheduler)',
+    '- [Source repository](https://github.com/prashantrajm/react-native-alarm-scheduler)',
     '- [npm package](https://www.npmjs.com/package/react-native-alarm-scheduler)',
     '',
   );
