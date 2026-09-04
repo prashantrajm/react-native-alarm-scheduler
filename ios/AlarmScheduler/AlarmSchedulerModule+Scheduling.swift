@@ -262,7 +262,6 @@ extension AlarmSchedulerModule {
     let secondaryButtonTitle = options?.secondaryButtonTitle?.isEmpty == false
       ? options!.secondaryButtonTitle!
       : (alertActionMode == "openAppOnly" ? "Open app" : nil)
-    let countdownTitle = options?.countdownTitle?.isEmpty == false ? options!.countdownTitle! : nil
     let secondaryButtonBehavior = normalizeSecondaryButtonBehavior(options?.secondaryButtonBehavior, hasSecondaryButton: secondaryButtonTitle != nil)
     let secondaryButton = secondaryButtonTitle.map {
       AlarmButton(text: LocalizedStringResource(stringLiteral: $0), textColor: .white, systemImageName: "app.badge")
@@ -276,10 +275,7 @@ extension AlarmSchedulerModule {
       stopIntentBehavior: normalizeStopIntentBehavior(options?.stopIntentBehavior),
       secondaryButtonBehaviorName: normalizeSecondaryButtonBehaviorName(options?.secondaryButtonBehavior, hasSecondaryButton: secondaryButtonTitle != nil)
     )
-    let presentation = AlarmPresentation(
-      alert: alertPresentation.alert,
-      countdown: countdownTitle.map { AlarmPresentation.Countdown(title: LocalizedStringResource(stringLiteral: $0)) }
-    )
+    let presentation = AlarmPresentation(alert: alertPresentation.alert)
     let attributes = AlarmAttributes(
       presentation: presentation,
       metadata: AlarmSchedulerMetadata(alarmId: id, title: title, values: alarmKitMetadataValues(metadata)),

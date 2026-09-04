@@ -48,6 +48,7 @@ export type IosAlarmOptions = {
   alertActionMode?: AlarmAlertActionMode;
   stopButtonTitle?: string;
   secondaryButtonTitle?: string;
+  /** Title shown while a deferred or follow-up timer occurrence is counting down. */
   countdownTitle?: string;
   stopIntentBehavior?: "recordOnly" | "openApp" | "rescheduleImmediate";
   secondaryButtonBehavior?: "openApp" | "recordOnly" | "none";
