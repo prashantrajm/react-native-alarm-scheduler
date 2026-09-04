@@ -181,7 +181,9 @@ await AlarmScheduler.resolveAlarmOccurrenceAsync(occurrenceId, {
 ```
 
 Use `relationship: 'followUp'` with `outcome: 'completed'` to schedule another delivery after the
-current occurrence is complete. See
+current occurrence is complete. Repeating primaries receive a fresh `occurrenceId` for every
+delivery, and idempotency keys are scoped to that concrete occurrence. Resolving a delivery leaves
+the repeating definition and its next scheduled delivery intact. See
 [Alarm occurrences](https://react-native-alarm-scheduler.vercel.app/api/occurrences).
 
 ## Contributing

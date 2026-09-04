@@ -7,6 +7,26 @@
   the GitHub Release fall back to "See CHANGELOG.md for details."
 -->
 
+## 1.0.1
+
+### 🐛 Bug fixes
+
+- Preserve an iOS repeating AlarmKit schedule when resolving or cancelling its current primary
+  occurrence. Resolution now stops only an actively alerting primary while cancelling related
+  deferred, follow-up and recovery timers independently.
+- Give every Android and iOS primary delivery its own persisted occurrence id, refresh the active
+  occurrence when a repeating alarm fires, and carry that identity through native context, events
+  and cold-launch handoff records.
+- Scope resolution idempotency to a concrete occurrence so reusing an application key for a later
+  repeating delivery cannot return an earlier delivery's result.
+- Mark superseded related occurrences cancelled when their native timers are cleared, including
+  when the operating system rejects a requested next timer.
+
+### 🧪 Tests
+
+- Add Android and iOS native regression coverage for per-delivery identity, occurrence-scoped
+  idempotency and the iOS repeating-primary preservation policy.
+
 ## 1.0.0
 
 This major release gives the package a platform-neutral module identity, adds atomic deferred and

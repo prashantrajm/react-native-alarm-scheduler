@@ -348,8 +348,9 @@ class AlarmSchedulerModule : Module() {
       .firstOrNull { it.optString("phase") == "ringing" }
       ?.let { occurrence ->
         result["occurrenceId"] = occurrence.optString("occurrenceId")
-        result["nativeAlarmId"] = occurrence.optString("occurrenceId")
-        result["relationship"] = occurrence.optString("relationship", "primary")
+        val relationship = occurrence.optString("relationship", "primary")
+        result["nativeAlarmId"] = if (relationship == "primary") alarmId else occurrence.optString("occurrenceId")
+        result["relationship"] = relationship
         occurrence.optJSONObject("metadata")?.let { result["metadata"] = AlarmSchedulerJson.toMap(it) }
       }
     return result

@@ -27,13 +27,19 @@ extension AlarmSchedulerModule {
     metadata: [String: Any]
   ) {
     AlarmSchedulerOccurrenceStore.save([
-      "occurrenceId": UUID(uuidString: alarmId)?.uuidString ?? alarmId,
+      "occurrenceId": AlarmSchedulerOccurrencePolicy.newPrimaryOccurrenceId(),
       "alarmId": alarmId,
+      "nativeAlarmId": alarmId,
       "scheduledFor": scheduledFor,
       "relationship": "primary",
       "phase": "scheduled",
       "metadata": metadata
     ])
+  }
+
+  func activePrimaryOccurrence(alarmId: String, metadata: [String: Any]) -> [String: Any] {
+    AlarmSchedulerNativeAlarmStore.resetCompletion(alarmId: alarmId)
+    return AlarmSchedulerOccurrenceStore.activatePrimaryOccurrence(alarmId: alarmId, metadata: metadata)
   }
 
   func visibleScheduledAlarms() -> [[String: Any]] {

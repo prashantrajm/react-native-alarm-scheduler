@@ -98,6 +98,10 @@ Use the returned `occurrenceId` with `cancelAlarmOccurrenceAsync`; do not cancel
 alarm when only one occurrence should be removed. Reconcile persisted state with
 `getAlarmOccurrencesAsync()` after cold launch.
 
+Each repeating primary delivery has a new `occurrenceId` while `alarmId` remains stable. Build
+idempotency keys from the concrete occurrence, and never cache a primary occurrence id across
+deliveries. Resolving the current primary preserves the repeating native schedule.
+
 ## Completion-gated alarms
 
 An alarm that keeps ringing until the app confirms the user finished something. Use

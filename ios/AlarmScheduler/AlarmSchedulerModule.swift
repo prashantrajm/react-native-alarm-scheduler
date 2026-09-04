@@ -214,13 +214,33 @@ public class AlarmSchedulerModule: Module {
   @available(iOS 26.0, *)
   @MainActor
   private func sendAlarmStateChange(_ alarm: Alarm) {
-    let occurrenceId = alarm.id.uuidString
-    let occurrence = AlarmSchedulerOccurrenceStore.occurrence(id: occurrenceId)
-    let alarmId = occurrence?["alarmId"] as? String ?? occurrenceId
+    let nativeAlarmId = alarm.id.uuidString
+    var occurrence = AlarmSchedulerOccurrenceStore.occurrence(id: nativeAlarmId)
+    let alarmId = occurrence?["alarmId"] as? String ?? nativeAlarmId
     let state = mapAlarmState(alarm.state)
-    if state == "alerting" {
+    if state == "alerting",
+      occurrence?["relationship"] as? String == "primary",
+      occurrence?["occurrenceId"] as? String == alarmId {
+      AlarmSchedulerOccurrenceStore.updatePhase(occurrenceId: alarmId, phase: "cancelled")
+      occurrence = nil
+    }
+    if occurrence == nil,
+      let storedAlarm = storedAlarms().first(where: { ($0["id"] as? String) == alarmId }) {
+      if state == "alerting" {
+        occurrence = activePrimaryOccurrence(
+          alarmId: alarmId,
+          metadata: storedAlarm["metadata"] as? [String: Any] ?? [:]
+        )
+      } else {
+        occurrence = AlarmSchedulerOccurrenceStore.all(alarmId: alarmId).first(where: {
+          ($0["relationship"] as? String) == "primary" &&
+            (($0["phase"] as? String) == "scheduled" || ($0["phase"] as? String) == "ringing")
+        })
+      }
+    } else if state == "alerting", let occurrenceId = occurrence?["occurrenceId"] as? String {
       AlarmSchedulerOccurrenceStore.updatePhase(occurrenceId: occurrenceId, phase: "ringing")
     }
+    let occurrenceId = occurrence?["occurrenceId"] as? String ?? nativeAlarmId
     var event: [String: Any] = [
       "id": alarmId,
       "occurrenceId": occurrenceId,
