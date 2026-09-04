@@ -34,9 +34,10 @@ if (!p.canScheduleExactAlarms) {
 
 1. `AlarmManager` delivers the broadcast to the package's receiver, even in Doze. Repeating alarms
    re-arm their next occurrence immediately.
-2. The receiver starts a foreground service, which takes a wake lock, pins the alarm stream volume,
-   and starts looping the alarm sound. The service outlives the receiver's 10-second window and does
-   not need a JS runtime.
+2. The receiver starts a foreground service, which takes a wake lock and, for audible alarms, pins
+   the alarm stream volume and starts looping the alarm sound. Silent alarms skip both audio and
+   volume enforcement while retaining independently configured vibration. The service outlives the
+   receiver's 10-second window and does not need a JS runtime.
 3. The service posts an ongoing, full-screen-intent notification and launches the ringing screen
    directly — `setAlarmClock()` grants the background activity-start allowance that makes this legal.
 4. Before anything else, the handoff and action records are written to disk, so a cold-launched app

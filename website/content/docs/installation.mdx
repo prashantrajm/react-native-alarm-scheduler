@@ -56,7 +56,8 @@ npx expo run:ios
 | `iosAlarmSounds` | `string[]` | `[]` | Adds a developer-owned sound catalog to the iOS app bundle. Runtime user-selected sounds use `soundUri` and need no config entry. |
 
 The plugin also enables `NSSupportsLiveActivities` for iOS AlarmKit intents and adds
-`com.android.alarm.permission.SET_ALARM` for Android system Clock alarm intents.
+`com.android.alarm.permission.SET_ALARM` for Android system Clock alarm intents. It also bundles the
+package's internal iOS silence asset automatically; `silent: true` needs no plugin option.
 
 ## What the package adds on its own
 

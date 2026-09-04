@@ -15,6 +15,14 @@ iOS alarm scheduling uses AlarmKit. The app must:
 Older iOS versions return `status: 'unavailable'`. `canScheduleExactAlarms` is `true` only when
 AlarmKit is available *and* authorized.
 
+## Silent alarms
+
+`ios: { silent: true }` uses a silent sound bundled automatically by the config plugin. AlarmKit
+still owns and displays the native alarm presentation. On iOS Simulator, scheduling a silent alarm
+is rejected because named AlarmKit sounds are not safe there; test this behavior on a physical iOS
+26+ device. If the bundled asset is missing from a physical build, scheduling fails rather than
+falling back to the audible system default.
+
 ## No launch routing
 
 <Callout type="warn">

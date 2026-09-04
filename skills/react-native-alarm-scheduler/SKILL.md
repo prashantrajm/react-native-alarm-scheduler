@@ -54,9 +54,9 @@ Writing alarm routing *only* inside an event listener is the single most common 
 can share ids.
 
 **4. Android inherits the `ios` options.** `metadata`, `alertTitle`, `alertActionMode`,
-`stopButtonTitle`, `secondaryButtonTitle`, `stopIntentBehavior`, `secondaryButtonBehavior` and
-`soundUri` and `soundName` fall back to the `ios` value when omitted. Do not duplicate them into `android` — set
-`android` fields only where the platforms should genuinely differ (`launchUri`,
+`stopButtonTitle`, `secondaryButtonTitle`, `stopIntentBehavior`, `secondaryButtonBehavior`, `silent`,
+`soundUri` and `soundName` fall back to the `ios` value when omitted. Do not duplicate them into
+`android` — set `android` fields only where the platforms should genuinely differ (`launchUri`,
 `maxRingDurationSeconds`, volume behavior).
 
 **5. `completeNativeAlarmAsync(alarmId)` is mandatory, not advisory.** With
@@ -70,6 +70,12 @@ transcodes the first 29 seconds to a PCM CAF for AlarmKit. DRM-protected Apple M
 tracks cannot be imported because the app never receives their audio bytes. iOS Simulator uses the
 system default sound because its ToneLibrary can crash SpringBoard for external AlarmKit sounds;
 verify custom iOS playback on a physical device.
+
+**7. Use `silent`, not a zero-volume workaround.** `silent: true` overrides `soundUri` and
+`soundName`. Android skips playback and volume enforcement while leaving `vibrate` independent. On
+physical iOS 26+ devices the config plugin's bundled silent CAF preserves the AlarmKit presentation;
+the Simulator rejects silent scheduling, and a missing bundled asset fails scheduling rather than
+falling back to the audible system sound.
 
 ## Deferred and follow-up occurrences
 

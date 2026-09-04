@@ -24,6 +24,7 @@ struct IosAlarmOptionsRecord: Record {
   @Field var secondaryButtonBehavior: String?
   @Field var soundUri: String?
   @Field var soundName: String?
+  @Field var silent: Bool = false
 }
 
 final class InvalidAlarmException: Exception {

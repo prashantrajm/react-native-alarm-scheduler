@@ -132,11 +132,27 @@ export function AlarmsScreen(props: { controller: AlarmController }) {
             value={controller.requiresAppCompletion}
           />
         </View>
+        <View style={styles.switchRow}>
+          <View style={styles.switchCopy}>
+            <Text style={styles.switchTitle}>Silent alarm</Text>
+            <Text style={styles.help}>
+              Suppress audio while preserving vibration and native alarm UI.
+            </Text>
+          </View>
+          <Switch
+            onValueChange={controller.setSilent}
+            trackColor={{ false: colors.border, true: colors.primarySoft }}
+            thumbColor={controller.silent ? colors.primary : "#fff"}
+            value={controller.silent}
+          />
+        </View>
         <View style={styles.soundRow}>
           <View style={styles.soundCopy}>
             <Text style={styles.label}>Sound</Text>
             <Text numberOfLines={1} style={styles.help}>
-              {controller.sound?.name ?? "System default"}
+              {controller.silent
+                ? "No audio"
+                : controller.sound?.name ?? "System default"}
             </Text>
           </View>
           <AppButton

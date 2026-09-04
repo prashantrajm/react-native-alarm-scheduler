@@ -7,6 +7,8 @@ import AlarmKit
 #endif
 
 extension AlarmSchedulerModule {
+  static let silentSoundName = "alarm-scheduler-silence.caf"
+
   func normalizeMetadata(_ metadata: [String: Any]?, id: String, title: String) -> [String: Any] {
     var normalized: [String: Any] = [:]
     metadata?.forEach { key, value in
@@ -37,6 +39,21 @@ extension AlarmSchedulerModule {
       return nil
     }
     return soundName
+  }
+
+  func bundledSilentSoundName() throws -> String {
+    #if targetEnvironment(simulator)
+    throw UnsupportedAlarmException(
+      "Silent AlarmKit alarms require a physical iOS device because custom alert sounds are unsafe in the iOS Simulator."
+    )
+    #else
+    guard Bundle.main.url(forResource: "alarm-scheduler-silence", withExtension: "caf") != nil else {
+      throw InvalidAlarmException(
+        "The bundled silent alarm sound is missing. Apply the react-native-alarm-scheduler config plugin and rebuild the iOS app."
+      )
+    }
+    return Self.silentSoundName
+    #endif
   }
 
   /**

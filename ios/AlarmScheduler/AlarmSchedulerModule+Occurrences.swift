@@ -23,6 +23,7 @@ extension AlarmSchedulerModule {
     if let countdownTitle = options?.countdownTitle?.nilIfEmpty {
       result["countdownTitle"] = countdownTitle
     }
+    result["silent"] = options?.silent == true
     return result
   }
 

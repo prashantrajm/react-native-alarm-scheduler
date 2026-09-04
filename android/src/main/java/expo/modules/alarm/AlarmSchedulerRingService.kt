@@ -87,7 +87,7 @@ class AlarmSchedulerRingService : Service() {
 
     // A second broadcast for an alarm that is already ringing (a backup catching up, say) must
     // not restart playback or stack notifications.
-    if (alarmId == id && mediaPlayer != null) {
+    if (alarmId == id && (resolved.silent || mediaPlayer != null)) {
       startForegroundNotification(id, resolved)
       return
     }
@@ -99,8 +99,10 @@ class AlarmSchedulerRingService : Service() {
 
     startForegroundNotification(id, resolved)
     acquireWakeLock(resolved)
-    enforceAlarmVolume(resolved)
-    startPlayback(resolved)
+    if (!resolved.silent) {
+      enforceAlarmVolume(resolved)
+      startPlayback(resolved)
+    }
     startVibration(resolved)
     scheduleTimeout(id, resolved)
     presentFullScreen(id, resolved, intent.getBooleanExtra(EXTRA_IS_BACKUP, false))

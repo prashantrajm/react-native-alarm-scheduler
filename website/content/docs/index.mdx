@@ -38,6 +38,7 @@ await AlarmScheduler.scheduleAlarmAsync({
 - **Cold-launch handoff records** written natively before any JS runs, so your app always knows why
   it opened.
 - **User-selected alarm sounds** from runtime picker URIs, with a different local file per alarm.
+- **Silent alarms** that preserve native presentation and optional vibration without playing audio.
 - **System Clock integration** on Android via `ACTION_SET_ALARM` and `ACTION_SHOW_ALARMS`.
 - **Expo config plugin** for permissions and `NSAlarmKitUsageDescription`.
 - **Fully typed**, with explicit unavailable behavior where the OS cannot schedule alarms.
@@ -48,7 +49,8 @@ await AlarmScheduler.scheduleAlarmAsync({
 | --- | :---: | :---: |
 | Schedule, list and cancel app-owned alarms | ✅ | ✅ |
 | Permissions and settings surfaces | ✅ | ✅ |
-| Custom alarm sound | ✅ | ✅ |
+| Custom alarm sound | ✅ | ✅ physical device; system default in Simulator |
+| Silent alarm | ✅ | ✅ physical device; rejected in Simulator |
 | Ring until the app says stop (`openAppOnly`) | ✅ | ⚠️ |
 | Cold-launch handoff, action records, backup alarms | ✅ | ✅ |
 | Survive reboot | ✅ | ✅ |

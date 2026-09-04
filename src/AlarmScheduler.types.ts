@@ -56,6 +56,8 @@ export type IosAlarmOptions = {
   soundUri?: string;
   /** Name of a sound already bundled in the app or present in `Library/Sounds`. */
   soundName?: string;
+  /** Use the package's bundled silent tone. Overrides `soundUri` and `soundName`. */
+  silent?: boolean;
 };
 
 /**
@@ -86,6 +88,8 @@ export type AndroidAlarmOptions = {
   soundName?: string;
   /** Runtime audio file URI. Takes precedence over `soundName` and is copied for durable access. */
   soundUri?: string;
+  /** Suppress audio playback while preserving vibration and alarm presentation. Defaults to `false`. */
+  silent?: boolean;
   /** Defaults to `true`. */
   vibrate?: boolean;
   /**
@@ -252,7 +256,7 @@ export type NativeAlarmDebugState = {
     | "legacyStopButton"
     | "androidRingService";
   runtimeSupportsSecondaryOnlyAlert?: boolean;
-  sound?: "default" | "named";
+  sound?: "default" | "named" | "silent";
   soundName?: string;
   /** Explains why a requested custom sound was replaced with the system default. */
   soundFallbackReason?: "iosSimulatorCustomSoundUnsupported";

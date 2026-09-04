@@ -26,6 +26,11 @@ bundled sounds and the system default remain supported.
 
 ### 🎉 New features
 
+- Add first-class `silent` options for iOS and Android. Silent alarms preserve native presentation,
+  full-screen behavior, and independently configured vibration while suppressing audio; Android
+  also skips alarm-volume enforcement.
+- Bundle the iOS silent AlarmKit sound through the config plugin and fail scheduling closed if it is
+  unavailable, preventing an unintended fallback to the audible system sound.
 - Add `soundUri` to the shared schedule input and the `ios` and `android` option objects, allowing an
   alarm to use audio selected or downloaded while the app is running.
 - Copy Android picker-backed audio into app-owned storage before scheduling, so playback does not

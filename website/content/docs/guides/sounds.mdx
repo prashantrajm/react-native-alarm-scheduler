@@ -5,6 +5,33 @@ description: Let users choose a different local audio file for each alarm.
 
 import { Callout } from 'fumadocs-ui/components/callout';
 
+## Silent alarms
+
+Set `silent: true` in either platform's options when the alarm should present normally without
+playing audio:
+
+```ts
+await AlarmScheduler.scheduleAlarmAsync({
+  hour: 7,
+  minute: 0,
+  ios: { silent: true },
+  android: { silent: true, vibrate: true },
+});
+```
+
+`silent` takes precedence over `soundUri` and `soundName`. On Android it skips audio playback and
+alarm-volume enforcement; `vibrate` remains independent, so `silent: true, vibrate: true` is a
+vibrate-only alarm. The notification and full-screen ringing UI still appear.
+
+On a physical iOS 26+ device, the package uses its own bundled silent CAF while AlarmKit continues
+to own the alert presentation and vibration. The config plugin adds this asset automatically. If
+the asset is missing, scheduling fails instead of falling back to an audible system sound.
+
+<Callout type="warn" title="Silent AlarmKit alarms require a physical device">
+The iOS Simulator cannot safely use named AlarmKit sounds, including the package's silent sound.
+Silent scheduling is therefore rejected in the Simulator rather than becoming unexpectedly audible.
+</Callout>
+
 ## User-selected audio
 
 Use any document or media picker that returns a readable local URI. With Expo, install the
@@ -112,7 +139,8 @@ await AlarmScheduler.scheduleAlarmAsync({
 });
 ```
 
-Runtime `soundUri` takes precedence over bundled `soundName`.
+For audible alarms, runtime `soundUri` takes precedence over bundled `soundName`; `silent` takes
+precedence over both.
 
 ## Staying audible on Android
 

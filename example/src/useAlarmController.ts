@@ -33,6 +33,7 @@ export function useAlarmController() {
   const [delaySeconds, setDelaySeconds] = useState(60);
   const [relatedDelaySeconds, setRelatedDelaySeconds] = useState(60);
   const [requiresAppCompletion, setRequiresAppCompletion] = useState(true);
+  const [silent, setSilent] = useState(false);
   const [sound, setSound] = useState<{ name: string; uri: string }>();
   const [busy, setBusy] = useState<string>();
   const [error, setError] = useState<string>();
@@ -143,6 +144,7 @@ export function useAlarmController() {
           title: title.trim() || "Alarm",
           delaySeconds,
           soundUri: sound?.uri,
+          silent,
           requiresAppCompletion,
         }),
       alarmId
@@ -281,6 +283,8 @@ export function useAlarmController() {
     setRelatedDelaySeconds,
     requiresAppCompletion,
     setRequiresAppCompletion,
+    silent,
+    setSilent,
     sound,
     clearSound: () => setSound(undefined),
     busy,

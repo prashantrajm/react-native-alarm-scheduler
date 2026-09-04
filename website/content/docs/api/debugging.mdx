@@ -30,7 +30,7 @@ type NativeAlarmDebugState = {
   stopIntentBehavior?: 'recordOnly' | 'openApp' | 'rescheduleImmediate';
   alertInitializer?: 'secondaryOnly' | 'legacyStopButton' | 'androidRingService';
   runtimeSupportsSecondaryOnlyAlert?: boolean;
-  sound?: 'default' | 'named';
+  sound?: 'default' | 'named' | 'silent';
   soundName?: string;
   soundFallbackReason?: 'iosSimulatorCustomSoundUnsupported';
   soundUri?: string;

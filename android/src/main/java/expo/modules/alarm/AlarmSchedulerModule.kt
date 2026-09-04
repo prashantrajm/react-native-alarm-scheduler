@@ -38,6 +38,7 @@ class IosAlarmOptionsRecord : Record {
   @Field var secondaryButtonBehavior: String? = null
   @Field var soundUri: String? = null
   @Field var soundName: String? = null
+  @Field var silent: Boolean? = null
 }
 
 class AndroidAlarmOptionsRecord : Record {
@@ -51,6 +52,7 @@ class AndroidAlarmOptionsRecord : Record {
   @Field var secondaryButtonBehavior: String? = null
   @Field var soundName: String? = null
   @Field var soundUri: String? = null
+  @Field var silent: Boolean? = null
   @Field var vibrate: Boolean? = null
   @Field var enforceVolume: Boolean? = null
   @Field var restoreVolume: Boolean? = null
@@ -378,7 +380,11 @@ class AlarmSchedulerModule : Module() {
       "stopIntentBehavior" to options.stopIntentBehavior,
       "alertInitializer" to "androidRingService",
       "runtimeSupportsSecondaryOnlyAlert" to true,
-      "sound" to if (options.soundName == null && options.soundUri == null) "default" else "named",
+      "sound" to when {
+        options.silent -> "silent"
+        options.soundName == null && options.soundUri == null -> "default"
+        else -> "named"
+      },
       "soundName" to options.soundName,
       "soundUri" to options.soundUri,
       "isRinging" to (AlarmSchedulerRingService.activeAlarmId() == alarmId),

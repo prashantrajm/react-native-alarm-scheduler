@@ -52,6 +52,7 @@ export async function scheduleExampleAlarm(options: {
   title: string;
   delaySeconds: number;
   soundUri?: string;
+  silent: boolean;
   requiresAppCompletion: boolean;
 }) {
   const timestamp = Date.now() + options.delaySeconds * 1000;
@@ -76,6 +77,7 @@ export async function scheduleExampleAlarm(options: {
         ? "rescheduleImmediate"
         : "recordOnly",
       secondaryButtonBehavior: "openApp",
+      silent: options.silent,
     },
     android: {
       alertBody: "Open the app to manage this alarm",
@@ -83,6 +85,7 @@ export async function scheduleExampleAlarm(options: {
       maxRingDurationSeconds: options.requiresAppCompletion ? 0 : 180,
       fullScreen: true,
       fullScreenTarget: "native",
+      silent: options.silent,
     },
   });
 }

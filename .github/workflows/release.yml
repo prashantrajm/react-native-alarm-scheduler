@@ -114,7 +114,8 @@ jobs:
             "android/src/main/AndroidManifest.xml" \
             "android/src/main/java/expo/modules/alarm/AlarmSchedulerModule.kt" \
             "android/src/main/java/expo/modules/alarm/AlarmSchedulerRingService.kt" \
-            "ios/AlarmSchedulerModule.swift" \
+            "assets/alarm-scheduler-silence.caf" \
+            "ios/AlarmScheduler/AlarmSchedulerModule.swift" \
             "app.plugin.js" \
             "build/index.js" \
             "build/index.d.ts"

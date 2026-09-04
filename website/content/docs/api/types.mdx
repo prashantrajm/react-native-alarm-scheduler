@@ -120,6 +120,7 @@ type IosAlarmOptions = {
   countdownTitle?: string;
   stopIntentBehavior?: 'recordOnly' | 'openApp' | 'rescheduleImmediate';
   secondaryButtonBehavior?: 'openApp' | 'recordOnly' | 'none';
+  silent?: boolean;
   soundUri?: string;
   soundName?: string;
 };
@@ -133,6 +134,7 @@ type AndroidAlarmOptions = {
   secondaryButtonTitle?: string;
   stopIntentBehavior?: 'recordOnly' | 'openApp' | 'rescheduleImmediate';
   secondaryButtonBehavior?: 'openApp' | 'recordOnly' | 'none';
+  silent?: boolean;
   soundName?: string;
   soundUri?: string;
   vibrate?: boolean;
@@ -217,7 +219,7 @@ type NativeAlarmDebugState = {
   stopIntentBehavior?: 'recordOnly' | 'openApp' | 'rescheduleImmediate';
   alertInitializer?: 'secondaryOnly' | 'legacyStopButton' | 'androidRingService';
   runtimeSupportsSecondaryOnlyAlert?: boolean;
-  sound?: 'default' | 'named';
+  sound?: 'default' | 'named' | 'silent';
   soundName?: string;
   soundFallbackReason?: 'iosSimulatorCustomSoundUnsupported';
   soundUri?: string;

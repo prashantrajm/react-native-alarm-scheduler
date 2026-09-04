@@ -36,6 +36,7 @@ internal data class AlarmSchedulerOptions(
   val secondaryButtonBehavior: String,
   val soundName: String?,
   val soundUri: String?,
+  val silent: Boolean,
   val vibrate: Boolean,
   val enforceVolume: Boolean,
   val restoreVolume: Boolean,
@@ -57,6 +58,7 @@ internal data class AlarmSchedulerOptions(
     .put("secondaryButtonBehavior", secondaryButtonBehavior)
     .put("soundName", soundName ?: JSONObject.NULL)
     .put("soundUri", soundUri ?: JSONObject.NULL)
+    .put("silent", silent)
     .put("vibrate", vibrate)
     .put("enforceVolume", enforceVolume)
     .put("restoreVolume", restoreVolume)
@@ -99,6 +101,7 @@ internal data class AlarmSchedulerOptions(
         ),
         soundName = firstNonBlank(android?.soundName, ios?.soundName),
         soundUri = firstNonBlank(android?.soundUri, soundUri, ios?.soundUri),
+        silent = android?.silent ?: ios?.silent ?: false,
         vibrate = android?.vibrate ?: true,
         enforceVolume = android?.enforceVolume ?: true,
         restoreVolume = android?.restoreVolume ?: true,
@@ -133,6 +136,7 @@ internal data class AlarmSchedulerOptions(
         secondaryButtonBehavior = normalizeSecondaryButtonBehavior(json.optStringOrNull("secondaryButtonBehavior")),
         soundName = json.optStringOrNull("soundName"),
         soundUri = json.optStringOrNull("soundUri"),
+        silent = json.optBoolean("silent", false),
         vibrate = json.optBoolean("vibrate", true),
         enforceVolume = json.optBoolean("enforceVolume", true),
         restoreVolume = json.optBoolean("restoreVolume", true),

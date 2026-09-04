@@ -20,7 +20,10 @@ extension AlarmSchedulerModule {
       ?? nextTriggerTimestamp(hour: hour, minute: minute, weekdays: weekdays)
     let runtimeSoundUri = normalizedSoundName(alarm.ios?.soundUri) ?? normalizedSoundName(alarm.soundUri)
     let soundName: String?
-    if let runtimeSoundUri {
+    if alarm.ios?.silent == true {
+      removeRuntimeSound(alarmId: id)
+      soundName = try bundledSilentSoundName()
+    } else if let runtimeSoundUri {
       soundName = try prepareRuntimeSound(uri: runtimeSoundUri, alarmId: id)
     } else {
       removeRuntimeSound(alarmId: id)
@@ -38,7 +41,8 @@ extension AlarmSchedulerModule {
         weekdays: weekdays,
         options: alarm.ios,
         metadata: metadata,
-        soundName: soundName
+        soundName: soundName,
+        silent: alarm.ios?.silent == true
       )
     } else {
       throw UnsupportedAlarmException("AlarmKit requires iOS 26 or newer.")
@@ -250,7 +254,8 @@ extension AlarmSchedulerModule {
     weekdays: [Int],
     options: IosAlarmOptionsRecord?,
     metadata: [String: Any],
-    soundName: String?
+    soundName: String?,
+    silent: Bool
   ) async throws -> [String: Any] {
     guard let alarmID = UUID(uuidString: id) else {
       throw InvalidAlarmException("Alarm id must be a UUID string on iOS.")
@@ -304,7 +309,7 @@ extension AlarmSchedulerModule {
       )
     )
     var debugState = alertPresentation.debugState
-    debugState["sound"] = effectiveSoundName == nil ? "default" : "named"
+    debugState["sound"] = silent ? "silent" : (effectiveSoundName == nil ? "default" : "named")
     if let effectiveSoundName {
       debugState["soundName"] = effectiveSoundName
     } else if soundName != nil {

@@ -7,6 +7,7 @@
   "files": [
     "CHANGELOG.md",
     "README.md",
+    "assets",
     "android/build.gradle",
     "android/src",
     "app.plugin.js",
@@ -23,6 +24,7 @@
     "lint": "expo-module lint",
     "test": "expo-module test",
     "prepare": "expo-module prepare",
+    "prepack": "node scripts/verify-silent-sound.mjs",
     "prepublishOnly": "expo-module prepublishOnly",
     "expo-module": "expo-module",
     "open:ios": "xed example/ios",

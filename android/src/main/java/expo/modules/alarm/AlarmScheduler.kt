@@ -28,7 +28,10 @@ internal object AlarmSchedulerScheduler {
     val title = alarm.title?.takeIf { it.isNotBlank() } ?: "Alarm"
     val weekdays = normalizeWeekdays(alarm.weekdays)
     var options = AlarmSchedulerOptions.resolve(title, id, alarm.soundUri, alarm.android, alarm.ios)
-    options = if (options.soundUri != null) {
+    options = if (options.silent) {
+      AlarmSchedulerSoundStore.delete(context, id)
+      options.copy(soundName = null, soundUri = null)
+    } else if (options.soundUri != null) {
       options.copy(soundUri = AlarmSchedulerSoundStore.import(context, id, options.soundUri).toString())
     } else {
       AlarmSchedulerSoundStore.delete(context, id)

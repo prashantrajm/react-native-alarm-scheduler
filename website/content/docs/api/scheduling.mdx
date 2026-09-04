@@ -89,15 +89,19 @@ type IosAlarmOptions = {
   countdownTitle?: string;
   stopIntentBehavior?: 'recordOnly' | 'openApp' | 'rescheduleImmediate';
   secondaryButtonBehavior?: 'openApp' | 'recordOnly' | 'none';
+  silent?: boolean;
   soundUri?: string;
   soundName?: string;
 };
 ```
 
 `metadata` is stored by the package and included in AlarmKit metadata; the package always adds
-`alarmId` and `title`. `soundUri` is transcoded into `Library/Sounds` and takes precedence over
-`soundName`. `soundName` maps directly to `AlertConfiguration.AlertSound.named(soundName)` and must
-already exist in the app bundle or `Library/Sounds`.
+`alarmId` and `title`. `silent` uses the package's bundled silent sound and takes precedence over
+`soundUri` and `soundName`. It is supported on physical iOS 26+ devices; the Simulator rejects it
+instead of falling back to audible audio. `soundUri` is transcoded into `Library/Sounds` and takes
+precedence over `soundName`. `soundName` maps directly to
+`AlertConfiguration.AlertSound.named(soundName)` and must already exist in the app bundle or
+`Library/Sounds`.
 
 See [iOS platform behavior](/platforms/ios#alert-presentation) for what each `stopIntentBehavior` and
 `secondaryButtonBehavior` value actually does.
@@ -114,6 +118,7 @@ type AndroidAlarmOptions = {
   secondaryButtonTitle?: string;
   stopIntentBehavior?: 'recordOnly' | 'openApp' | 'rescheduleImmediate';
   secondaryButtonBehavior?: 'openApp' | 'recordOnly' | 'none';
+  silent?: boolean;
   soundName?: string;
   soundUri?: string;
   vibrate?: boolean;
@@ -131,6 +136,7 @@ type AndroidAlarmOptions = {
 | Field | Default | Notes |
 | --- | --- | --- |
 | `alertBody` | `"Alarm"` | Secondary line on the ringing screen and notification. |
+| `silent` | `false` | Suppress audio and volume enforcement. Vibration remains controlled by `vibrate`. |
 | `soundName` | — | File in `android/app/src/main/res/raw`, extension optional. |
 | `soundUri` | — | Runtime local URI. Copied into durable private storage and takes precedence over `soundName`. |
 | `vibrate` | `true` | |
@@ -145,9 +151,9 @@ type AndroidAlarmOptions = {
 
 <Callout title="Android inherits the iOS options">
 `metadata`, `alertTitle`, `alertActionMode`, `stopButtonTitle`, `secondaryButtonTitle`,
-`stopIntentBehavior`, `secondaryButtonBehavior`, `soundUri` and `soundName` fall back to the matching `ios` value
-when omitted. An app written against the AlarmKit flow behaves the same on Android without passing an
-`android` block at all.
+`stopIntentBehavior`, `secondaryButtonBehavior`, `silent`, `soundUri` and `soundName` fall back to
+the matching `ios` value when omitted. An app written against the AlarmKit flow behaves the same on
+Android without passing an `android` block at all.
 </Callout>
 
 ## `cancelAlarmAsync(id)`

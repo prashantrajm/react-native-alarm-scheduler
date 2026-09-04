@@ -115,7 +115,8 @@ internal object AlarmSchedulerNotifications {
 
   private fun createFallbackChannel(context: Context, options: AlarmSchedulerOptions): String {
     val sound = fallbackSoundUri(context, options)
-    val channelId = "${CHANNEL_FALLBACK}_${sound.toString().hashCode().toUInt().toString(16)}"
+    val vibrationKey = if (options.vibrate) "vibrate" else "no_vibration"
+    val channelId = "${CHANNEL_FALLBACK}_${sound.toString().hashCode().toUInt().toString(16)}_$vibrationKey"
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
       return channelId
     }
@@ -139,6 +140,9 @@ internal object AlarmSchedulerNotifications {
   }
 
   private fun fallbackSoundUri(context: Context, options: AlarmSchedulerOptions): Uri? {
+    if (options.silent) {
+      return null
+    }
     options.soundUri?.let { raw ->
       runCatching { Uri.parse(raw) }.getOrNull()?.takeUnless { it.scheme == "file" }?.let { return it }
     }
