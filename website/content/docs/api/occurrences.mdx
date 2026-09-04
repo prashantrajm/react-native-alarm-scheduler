@@ -1,0 +1,84 @@
+---
+title: Alarm occurrences
+description: Resolve a ringing occurrence and optionally create a deferred or follow-up occurrence.
+---
+
+An alarm definition owns presentation, sound, repetition, and default metadata. An **occurrence** is
+one concrete native delivery of that definition. Keeping these identities separate lets an app defer
+an active alarm or schedule a later follow-up without rebuilding the native definition itself.
+
+`relationship` describes how deliveries relate to one another. Optional `metadata` is stored and
+returned unchanged for application-defined context.
+
+## `resolveAlarmOccurrenceAsync(occurrenceId, resolution)`
+
+Stops and resolves the active native occurrence, cancels stale recovery timers, preserves the alarm
+definition when needed, and optionally schedules the next occurrence as one library operation.
+
+### Defer an occurrence
+
+```ts
+const result = await AlarmScheduler.resolveAlarmOccurrenceAsync(occurrenceId, {
+  outcome: 'deferred',
+  next: {
+    delaySeconds: 5 * 60,
+    relationship: 'deferred',
+  },
+  idempotencyKey: `defer:${occurrenceId}:1`,
+});
+```
+
+A `deferred` outcome must create a `deferred` next occurrence. The package preserves the alarm's
+sound and presentation and overlays the supplied metadata on the definition metadata.
+
+### Complete with a follow-up
+
+```ts
+const result = await AlarmScheduler.resolveAlarmOccurrenceAsync(occurrenceId, {
+  outcome: 'completed',
+  next: {
+    delaySeconds: 10 * 60,
+    relationship: 'followUp',
+  },
+  idempotencyKey: `follow-up:${occurrenceId}`,
+});
+```
+
+`idempotencyKey` is strongly recommended for UI actions. Retrying the same resolution returns its
+original result instead of creating another occurrence.
+
+The result status is `resolved` when the requested transition completed. It is
+`resolvedWithoutNext` when the current occurrence was resolved but the operating system rejected
+the requested next schedule. In that case `nextOccurrence` is absent.
+
+## `getAlarmOccurrencesAsync(alarmId?)`
+
+Returns persisted occurrence records, newest first. Pass an alarm id to filter them.
+
+```ts
+type AlarmOccurrence = {
+  occurrenceId: string;
+  alarmId: string;
+  parentOccurrenceId?: string;
+  scheduledFor: number;
+  relationship: 'primary' | 'deferred' | 'followUp';
+  phase: 'scheduled' | 'ringing' | 'completed' | 'cancelled';
+  metadata?: Record<string, string | number | boolean>;
+};
+```
+
+Persist your product statistics separately. The occurrence record is the native source of truth for
+whether a delivery is scheduled, ringing, completed, or cancelled.
+
+## `cancelAlarmOccurrenceAsync(occurrenceId)`
+
+Cancels one scheduled occurrence without cancelling its alarm definition or sibling occurrences.
+This is the appropriate operation when an app no longer needs a particular follow-up.
+
+The method returns `false` if the occurrence is unknown or already completed/cancelled.
+
+## Current context
+
+`getCurrentAlarmContextAsync()` includes `occurrenceId` and `relationship` when they are known. Its
+`id` remains the durable alarm id. On Android, a waiting deferred or follow-up occurrence is exposed
+as `countdown`; on iOS this maps naturally to the AlarmKit timer state.

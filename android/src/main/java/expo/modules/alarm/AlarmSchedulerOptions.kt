@@ -7,13 +7,6 @@ import kotlin.math.min
 internal const val ALERT_ACTION_MODE_DEFAULT = "default"
 internal const val ALERT_ACTION_MODE_OPEN_APP_ONLY = "openAppOnly"
 
-/**
- * Former name of [ALERT_ACTION_MODE_OPEN_APP_ONLY]. Still accepted from JS, and still read back out
- * of alarms persisted by older versions, so an app update must not quietly hand those alarms a stop
- * button. Normalized away on the way in; never written back out.
- */
-internal const val ALERT_ACTION_MODE_OPEN_APP_ONLY_LEGACY = "openMissionOnly"
-
 internal const val STOP_BEHAVIOR_RECORD_ONLY = "recordOnly"
 internal const val STOP_BEHAVIOR_OPEN_APP = "openApp"
 internal const val STOP_BEHAVIOR_RESCHEDULE = "rescheduleImmediate"
@@ -156,8 +149,7 @@ internal data class AlarmSchedulerOptions(
     }
 
     private fun normalizeAlertActionMode(value: String?): String = when (value) {
-      ALERT_ACTION_MODE_OPEN_APP_ONLY, ALERT_ACTION_MODE_OPEN_APP_ONLY_LEGACY ->
-        ALERT_ACTION_MODE_OPEN_APP_ONLY
+      ALERT_ACTION_MODE_OPEN_APP_ONLY -> ALERT_ACTION_MODE_OPEN_APP_ONLY
       else -> ALERT_ACTION_MODE_DEFAULT
     }
 

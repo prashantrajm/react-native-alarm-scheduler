@@ -40,6 +40,9 @@ internal object AlarmSchedulerScheduler {
     // A freshly scheduled alarm is never "already completed".
     AlarmSchedulerStore.resetCompletion(context, id)
     cancelBackups(context, id)
+    AlarmSchedulerOccurrenceStore.all(context, id)
+      .filter { it.optString("phase") == "scheduled" || it.optString("phase") == "ringing" }
+      .forEach { AlarmSchedulerOccurrenceStore.updatePhase(context, it.optString("occurrenceId"), "cancelled") }
 
     val stored = JSONObject()
       .put("id", id)
@@ -53,6 +56,16 @@ internal object AlarmSchedulerScheduler {
       .put("options", options.toJson())
 
     AlarmSchedulerStore.saveAlarm(context, stored)
+    AlarmSchedulerOccurrenceStore.save(
+      context,
+      JSONObject()
+        .put("occurrenceId", id)
+        .put("alarmId", id)
+        .put("scheduledFor", triggerAtMillis)
+        .put("relationship", "primary")
+        .put("phase", "scheduled")
+        .put("metadata", options.metadata)
+    )
     armExact(context, id, triggerAtMillis, isBackup = false, backupId = null)
     AlarmSchedulerEventBus.emitStateChange(id, "scheduled", options.metadata)
     return serialize(stored)
@@ -65,12 +78,26 @@ internal object AlarmSchedulerScheduler {
     AlarmSchedulerRingService.stopIfRinging(context, id)
     AlarmSchedulerStore.resetCompletion(context, id)
     AlarmSchedulerStore.clearActionsForAlarm(context, id)
+    AlarmSchedulerOccurrenceStore.all(context, id)
+      .filter { it.optString("phase") == "scheduled" || it.optString("phase") == "ringing" }
+      .forEach { AlarmSchedulerOccurrenceStore.updatePhase(context, it.optString("occurrenceId"), "cancelled") }
     val removed = AlarmSchedulerStore.removeAlarm(context, id)
     AlarmSchedulerSoundStore.delete(context, id)
     return existing != null || removed
   }
 
-  fun getAll(context: Context): List<Map<String, Any>> = AlarmSchedulerStore.alarms(context).map(::serialize)
+  fun getAll(context: Context): List<Map<String, Any>> = AlarmSchedulerStore.alarms(context)
+    .filter { stored ->
+      val alarmId = stored.optString("id")
+      val occurrences = AlarmSchedulerOccurrenceStore.all(context, alarmId)
+      AlarmSchedulerJson.intList(stored.optJSONArray("weekdays")).isNotEmpty() ||
+        occurrences.isEmpty() ||
+        occurrences.any {
+          it.optString("relationship") == "primary" &&
+            (it.optString("phase") == "scheduled" || it.optString("phase") == "ringing")
+        }
+    }
+    .map(::serialize)
 
   fun serialize(stored: JSONObject): Map<String, Any> {
     val result = mutableMapOf<String, Any>(
@@ -92,6 +119,7 @@ internal object AlarmSchedulerScheduler {
   fun handleTriggered(context: Context, intent: Intent) {
     val id = intent.getStringExtra(EXTRA_ID) ?: return
     val isBackup = intent.getBooleanExtra(EXTRA_IS_BACKUP, false)
+    val occurrenceId = intent.getStringExtra(EXTRA_BACKUP_ID) ?: id
     val stored = AlarmSchedulerStore.alarm(context, id)
 
     if (isBackup && AlarmSchedulerStore.isComplete(context, id)) {
@@ -109,6 +137,7 @@ internal object AlarmSchedulerScheduler {
       AlarmSchedulerStore.resetCompletion(context, id)
       rescheduleRepeatIfNeeded(context, stored)
     }
+    AlarmSchedulerOccurrenceStore.updatePhase(context, occurrenceId, "ringing")
 
     val options = AlarmSchedulerOptions.fromJson(
       stored.optJSONObject("options"),
@@ -124,10 +153,18 @@ internal object AlarmSchedulerScheduler {
       action = "secondaryOpen",
       details = mapOf("foregroundRequested" to true, "trigger" to true)
     )
-    AlarmSchedulerEventBus.emitTriggered(serialize(stored))
+    val triggered = serialize(stored).toMutableMap()
+    AlarmSchedulerOccurrenceStore.occurrence(context, occurrenceId)?.let { occurrence ->
+      triggered["occurrenceId"] = occurrenceId
+      triggered["relationship"] = occurrence.optString("relationship", "primary")
+      occurrence.optJSONObject("metadata")?.let { metadata ->
+        triggered["metadata"] = AlarmSchedulerJson.toMap(metadata)
+      }
+    }
+    AlarmSchedulerEventBus.emitTriggered(triggered)
     AlarmSchedulerStore.setActiveRingAlarmId(context, id)
 
-    if (!AlarmSchedulerRingService.start(context, id, isBackup)) {
+    if (!AlarmSchedulerRingService.start(context, id, isBackup, occurrenceId)) {
       presentWithoutService(context, id, options)
     }
   }
@@ -153,11 +190,22 @@ internal object AlarmSchedulerScheduler {
     val now = System.currentTimeMillis()
     AlarmSchedulerStore.alarms(context).forEach { stored ->
       val id = stored.optString("id").takeIf { it.isNotBlank() } ?: return@forEach
+      val relatedOccurrences = AlarmSchedulerOccurrenceStore.all(context, id).filter {
+        it.optString("relationship") != "primary" && it.optString("phase") == "scheduled"
+      }
+      relatedOccurrences.forEach { occurrence ->
+        val occurrenceId = occurrence.optString("occurrenceId")
+        val scheduledFor = max(now + 100, occurrence.optLong("scheduledFor"))
+        occurrence.put("scheduledFor", scheduledFor)
+        AlarmSchedulerOccurrenceStore.save(context, occurrence)
+        scheduleRelatedOccurrence(context, id, occurrenceId, scheduledFor)
+      }
       val weekdays = AlarmSchedulerJson.intList(stored.optJSONArray("weekdays"))
       val timestamp = stored.optLong("timestamp")
       val triggerAtMillis = when {
         timestamp > now -> timestamp
         weekdays.isNotEmpty() -> nextTriggerAtMillis(stored.optInt("hour"), stored.optInt("minute"), weekdays)
+        relatedOccurrences.isNotEmpty() -> return@forEach
         else -> {
           // A one-shot alarm whose time passed while the device was off is dropped, matching the
           // behaviour of the system Clock app.
@@ -228,9 +276,41 @@ internal object AlarmSchedulerScheduler {
   fun cancelBackups(context: Context, alarmId: String): Boolean {
     val backupId = backupAlarmId(alarmId)
     disarm(context, requestCode(backupId), triggerIntent(context, alarmId, isBackup = true, backupId = backupId))
-    val hadRetries = AlarmSchedulerStore.retryAlarmIds(context, alarmId).isNotEmpty()
+    val retryIds = AlarmSchedulerStore.retryAlarmIds(context, alarmId)
+    retryIds.filter { it != backupId }.forEach { retryId ->
+      disarm(context, requestCode(retryId), triggerIntent(context, alarmId, isBackup = true, backupId = retryId))
+    }
+    val hadRetries = retryIds.isNotEmpty()
     AlarmSchedulerStore.clearRetryAlarmIds(context, alarmId)
     return hadRetries
+  }
+
+  fun scheduleRelatedOccurrence(
+    context: Context,
+    alarmId: String,
+    occurrenceId: String,
+    scheduledFor: Long
+  ): Boolean {
+    val scheduled = armExact(context, alarmId, scheduledFor, isBackup = true, backupId = occurrenceId)
+    if (scheduled) {
+      AlarmSchedulerStore.addRetryAlarmId(context, occurrenceId, alarmId)
+    }
+    return scheduled
+  }
+
+  fun cancelRelatedOccurrence(context: Context, alarmId: String, occurrenceId: String) {
+    val isPrimary = occurrenceId == alarmId
+    disarm(
+      context,
+      requestCode(occurrenceId),
+      triggerIntent(
+        context,
+        alarmId,
+        isBackup = !isPrimary,
+        backupId = occurrenceId.takeUnless { isPrimary }
+      )
+    )
+    AlarmSchedulerStore.removeRetryAlarmId(context, occurrenceId, alarmId)
   }
 
   // endregion

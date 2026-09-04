@@ -4,6 +4,9 @@ import type {
   AlarmPermissionResponse,
   AlarmAction,
   AlarmContext,
+  AlarmOccurrence,
+  AlarmOccurrenceResolution,
+  AlarmOccurrenceResolutionResult,
   AlarmScheduleInput,
   AlarmSchedulerModuleEvents,
   NativeAlarmBackupResult,
@@ -61,6 +64,28 @@ class AlarmSchedulerModule extends NativeModule<AlarmSchedulerModuleEvents> {
   async clearPendingNativeAlarmHandoffAsync(): Promise<void> {}
 
   async completeNativeAlarmAsync(_alarmId: string): Promise<void> {}
+
+  async resolveAlarmOccurrenceAsync(
+    occurrenceId: string,
+    resolution: AlarmOccurrenceResolution,
+  ): Promise<AlarmOccurrenceResolutionResult> {
+    return {
+      alarmId: occurrenceId,
+      resolvedOccurrenceId: occurrenceId,
+      outcome: resolution.outcome,
+      status: resolution.next ? "resolvedWithoutNext" : "resolved",
+    };
+  }
+
+  async getAlarmOccurrencesAsync(
+    _alarmId?: string,
+  ): Promise<AlarmOccurrence[]> {
+    return [];
+  }
+
+  async cancelAlarmOccurrenceAsync(_occurrenceId: string): Promise<boolean> {
+    return false;
+  }
 
   async scheduleNativeAlarmBackupAsync(
     alarmId: string,

@@ -20,6 +20,8 @@ audio at runtime. Existing build-time bundled sounds and the system default rema
 - Rename the native registration, Android classes and components, iOS module and podspec to
   `AlarmScheduler`. Apps upgrading to 1.0.0 must install dependencies and perform a full native
   rebuild. Code that directly requires the old native module name must migrate to `AlarmScheduler`.
+- Remove the former alert-action mode alias. Use `alertActionMode: 'openAppOnly'`; unsupported mode
+  values now resolve to `default`.
 
 ### 🎉 New features
 
@@ -47,14 +49,9 @@ audio at runtime. Existing build-time bundled sounds and the system default rema
 
 Naming and documentation. No scheduling, ringing or completion logic changed.
 
-`alertActionMode: 'openMissionOnly'` still works, so no code change is required to upgrade.
-
 ### ♻️ Renamed
 
-- `alertActionMode: 'openMissionOnly'` is now **`'openAppOnly'`**. The old spelling is still accepted
-  on both platforms — including for alarms already persisted by an older build, so an app update
-  cannot silently hand those alarms a stop button — and will be removed in a future major. Whichever
-  you pass, `getNativeAlarmDebugStateAsync()` reports the canonical `openAppOnly`.
+- Rename the secondary-only alert action mode to **`openAppOnly`**.
 - The default secondary-button label for that mode changed from `"Start mission"` (Android) and
   `"Open"` (iOS) to **`"Open app"`** on both. Apps that set `secondaryButtonTitle` are unaffected.
 
@@ -186,7 +183,7 @@ runtime behavior, however, changes substantially — read this section before up
 
 ### 🎉 New features
 
-- Add iOS `alertActionMode: 'openMissionOnly'` to prefer AlarmKit's secondary-only alert presentation where supported.
+- Add an iOS alert action mode that prefers AlarmKit's secondary-only alert presentation where supported.
 - Expand `getNativeAlarmDebugStateAsync()` with AlarmKit alert/button configuration details.
 
 ## 0.1.4

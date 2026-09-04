@@ -77,9 +77,7 @@ type ScheduledAlarm = {
 ```ts
 type AlarmAlertActionMode =
   | 'default'
-  | 'openAppOnly'
-  /** @deprecated Use `openAppOnly`. Still accepted; will be removed in a future major. */
-  | 'openMissionOnly';
+  | 'openAppOnly';
 
 type IosAlarmOptions = {
   metadata?: AlarmMetadata;

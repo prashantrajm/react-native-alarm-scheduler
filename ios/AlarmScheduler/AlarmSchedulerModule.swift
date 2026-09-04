@@ -54,7 +54,7 @@ public class AlarmSchedulerModule: Module {
     }
 
     AsyncFunction("getScheduledAlarmsAsync") { () -> [[String: Any]] in
-      return self.storedAlarms()
+      return self.visibleScheduledAlarms()
     }
 
     AsyncFunction("getCurrentAlarmContextAsync") { () -> [String: Any]? in
@@ -81,6 +81,19 @@ public class AlarmSchedulerModule: Module {
       AlarmSchedulerNativeAlarmStore.complete(alarmId: alarmId)
       await self.cancelNativeAndRetryAlarms(originalAlarmId: alarmId)
       AlarmSchedulerNativeAlarmStore.clearActions(alarmId: alarmId)
+      self.finishOccurrenceRecords(alarmId: alarmId)
+    }
+
+    AsyncFunction("resolveAlarmOccurrenceAsync") { (occurrenceId: String, resolution: AlarmOccurrenceResolutionRecord) async throws -> [String: Any] in
+      return try await self.resolveAlarmOccurrence(occurrenceId: occurrenceId, resolution: resolution)
+    }
+
+    AsyncFunction("getAlarmOccurrencesAsync") { (alarmId: String?) -> [[String: Any]] in
+      return AlarmSchedulerOccurrenceStore.all(alarmId: alarmId)
+    }
+
+    AsyncFunction("cancelAlarmOccurrenceAsync") { (occurrenceId: String) async -> Bool in
+      return await self.cancelAlarmOccurrence(occurrenceId: occurrenceId)
     }
 
     AsyncFunction("scheduleNativeAlarmBackupAsync") { (alarmId: String, delaySeconds: Double?) async -> [String: Any] in
@@ -201,12 +214,25 @@ public class AlarmSchedulerModule: Module {
   @available(iOS 26.0, *)
   @MainActor
   private func sendAlarmStateChange(_ alarm: Alarm) {
+    let occurrenceId = alarm.id.uuidString
+    let occurrence = AlarmSchedulerOccurrenceStore.occurrence(id: occurrenceId)
+    let alarmId = occurrence?["alarmId"] as? String ?? occurrenceId
+    let state = mapAlarmState(alarm.state)
+    if state == "alerting" {
+      AlarmSchedulerOccurrenceStore.updatePhase(occurrenceId: occurrenceId, phase: "ringing")
+    }
     var event: [String: Any] = [
-      "id": alarm.id.uuidString,
-      "state": mapAlarmState(alarm.state),
+      "id": alarmId,
+      "occurrenceId": occurrenceId,
+      "state": state,
       "timestamp": Int64(Date().timeIntervalSince1970 * 1000)
     ]
-    if let storedAlarm = storedAlarms().first(where: { ($0["id"] as? String) == alarm.id.uuidString }) {
+    if let relationship = occurrence?["relationship"] {
+      event["relationship"] = relationship
+    }
+    if let metadata = occurrence?["metadata"] {
+      event["metadata"] = metadata
+    } else if let storedAlarm = storedAlarms().first(where: { ($0["id"] as? String) == alarmId }) {
       event["metadata"] = storedAlarm["metadata"]
     }
     sendEvent("onAlarmStateChange", event)

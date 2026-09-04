@@ -34,6 +34,8 @@ type AlarmSchedulerModuleEvents = {
 
 type AlarmStateChange = {
   id: string;
+  occurrenceId?: string;
+  relationship?: 'primary' | 'deferred' | 'followUp';
   state: 'scheduled' | 'alerting' | 'countdown' | 'paused';
   timestamp: number;
   metadata?: AlarmMetadata;

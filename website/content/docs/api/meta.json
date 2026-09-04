@@ -5,6 +5,7 @@
     "permissions",
     "scheduling",
     "context-and-actions",
+    "occurrences",
     "completion-and-backup",
     "system-clock",
     "debugging",

@@ -10,6 +10,7 @@ extension AlarmSchedulerModule {
   func schedule(_ alarm: AlarmScheduleRecord) async throws -> [String: Any] {
     let id = alarm.id?.isEmpty == false ? alarm.id! : UUID().uuidString
     AlarmSchedulerNativeAlarmStore.resetCompletion(alarmId: id)
+    cancelActiveOccurrenceRecords(alarmId: id)
     let hour = try requireHour(alarm.hour)
     let minute = try requireMinute(alarm.minute)
     let title = alarm.title?.isEmpty == false ? alarm.title! : "Alarm"
@@ -62,7 +63,9 @@ extension AlarmSchedulerModule {
     if let alarmKitDebugState {
       stored["alarmKitDebugState"] = alarmKitDebugState
     }
+    stored["occurrenceOptions"] = resolvedOccurrenceOptions(alarm.ios, title: title)
     save(alarm: stored)
+    recordPrimaryOccurrence(alarmId: id, scheduledFor: timestamp, metadata: metadata)
     return stored
   }
 
@@ -92,6 +95,7 @@ extension AlarmSchedulerModule {
 
     AlarmSchedulerNativeAlarmStore.resetCompletion(alarmId: id)
     AlarmSchedulerNativeAlarmStore.clearActions(alarmId: id)
+    cancelActiveOccurrenceRecords(alarmId: id)
     let didRemoveStoredAlarm = remove(id: id)
     removeRuntimeSound(alarmId: id)
     return didCancelNativeAlarm || didRemoveStoredAlarm
@@ -193,6 +197,17 @@ extension AlarmSchedulerModule {
 
       let activeContexts = activeAlarms.compactMap { alarm -> [String: Any]? in
         let id = alarm.id.uuidString
+        if let occurrence = AlarmSchedulerOccurrenceStore.occurrence(id: id),
+          let primaryId = occurrence["alarmId"] as? String,
+          let storedAlarm = storedById[primaryId],
+          var context = alarmContext(from: storedAlarm, state: mapAlarmState(alarm.state), nativeAlarmId: id) {
+          context["occurrenceId"] = id
+          context["relationship"] = occurrence["relationship"] ?? "primary"
+          if let metadata = occurrence["metadata"] {
+            context["metadata"] = metadata
+          }
+          return context
+        }
         if let primaryId = backupIdByPrimaryId[id], let storedAlarm = storedById[primaryId] {
           return alarmContext(from: storedAlarm, state: mapAlarmState(alarm.state), nativeAlarmId: id)
         }
@@ -303,7 +318,7 @@ extension AlarmSchedulerModule {
   }
 
   @available(iOS 26.0, *)
-  private func makeAlertPresentation(
+  func makeAlertPresentation(
     title: String,
     alertActionMode: String,
     stopButtonTitle: String,
@@ -351,12 +366,10 @@ extension AlarmSchedulerModule {
     )
   }
 
-  /// Normalizes to the canonical mode. `openMissionOnly` is the former name of `openAppOnly` and is
-  /// still accepted, so an app that has not migrated does not quietly regain a stop button.
   @available(iOS 26.0, *)
-  private func normalizeAlertActionMode(_ mode: String?) -> String {
+  func normalizeAlertActionMode(_ mode: String?) -> String {
     switch mode ?? "default" {
-    case "openAppOnly", "openMissionOnly":
+    case "openAppOnly":
       return "openAppOnly"
     default:
       return "default"
@@ -364,7 +377,7 @@ extension AlarmSchedulerModule {
   }
 
   @available(iOS 26.0, *)
-  private func normalizeStopIntentBehavior(_ behavior: String?) -> String {
+  func normalizeStopIntentBehavior(_ behavior: String?) -> String {
     switch behavior ?? "recordOnly" {
     case "recordOnly", "openApp", "rescheduleImmediate":
       return behavior ?? "recordOnly"
@@ -374,7 +387,7 @@ extension AlarmSchedulerModule {
   }
 
   @available(iOS 26.0, *)
-  private func normalizeSecondaryButtonBehaviorName(
+  func normalizeSecondaryButtonBehaviorName(
     _ behavior: String?,
     hasSecondaryButton: Bool
   ) -> String {
@@ -390,7 +403,7 @@ extension AlarmSchedulerModule {
   }
 
   @available(iOS 26.0, *)
-  private func makeStopIntent(
+  func makeStopIntent(
     id: String,
     title: String,
     hour: Int,
@@ -416,7 +429,7 @@ extension AlarmSchedulerModule {
   }
 
   @available(iOS 26.0, *)
-  private func makeSecondaryIntent(id: String, behavior: String?) -> (any LiveActivityIntent)? {
+  func makeSecondaryIntent(id: String, behavior: String?) -> (any LiveActivityIntent)? {
     switch behavior ?? "openApp" {
     case "openApp":
       return AlarmSchedulerSecondaryOpenIntent(alarmId: id)
@@ -428,7 +441,7 @@ extension AlarmSchedulerModule {
   }
 
   @available(iOS 26.0, *)
-  private func normalizeSecondaryButtonBehavior(
+  func normalizeSecondaryButtonBehavior(
     _ behavior: String?,
     hasSecondaryButton: Bool
   ) -> AlarmPresentation.Alert.SecondaryButtonBehavior? {

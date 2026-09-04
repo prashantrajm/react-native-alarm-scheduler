@@ -72,6 +72,7 @@ class AlarmSchedulerRingService : Service() {
 
   private fun handleStart(intent: Intent) {
     val id = intent.getStringExtra(EXTRA_ALARM_ID)
+    val occurrenceId = intent.getStringExtra(EXTRA_OCCURRENCE_ID) ?: id
     val stored = id?.let { AlarmSchedulerStore.alarm(this, it) }
     if (id == null || stored == null) {
       stopRinging()
@@ -106,7 +107,13 @@ class AlarmSchedulerRingService : Service() {
 
     // The handoff record and onAlarmTriggered are emitted by the receiver before this service is
     // even asked to start, so they survive the service being refused.
-    AlarmSchedulerEventBus.emitStateChange(id, "alerting", stored.optJSONObject("metadata"))
+    val occurrence = occurrenceId?.let { AlarmSchedulerOccurrenceStore.occurrence(this, it) }
+    AlarmSchedulerEventBus.emitStateChange(
+      id,
+      "alerting",
+      occurrence?.optJSONObject("metadata") ?: stored.optJSONObject("metadata"),
+      occurrence
+    )
   }
 
   private fun resumeOrStop() {
@@ -417,6 +424,7 @@ class AlarmSchedulerRingService : Service() {
     const val ACTION_COMPLETE = "expo.modules.alarm.RING_COMPLETE"
     const val EXTRA_ALARM_ID = "expo.modules.alarm.extra.ALARM_ID"
     const val EXTRA_IS_BACKUP = "expo.modules.alarm.extra.RING_IS_BACKUP"
+    const val EXTRA_OCCURRENCE_ID = "expo.modules.alarm.extra.OCCURRENCE_ID"
 
     private const val WAKE_LOCK_TAG = "AlarmScheduler:ring"
     private const val DEFAULT_WAKE_LOCK_TIMEOUT_MILLIS = 10 * 60 * 1000L
@@ -433,11 +441,12 @@ class AlarmSchedulerRingService : Service() {
      * propagate: an exception here would otherwise kill the broadcast receiver and the alarm with
      * it, which is the one outcome an alarm library may never produce.
      */
-    fun start(context: Context, alarmId: String, isBackup: Boolean): Boolean {
+    fun start(context: Context, alarmId: String, isBackup: Boolean, occurrenceId: String): Boolean {
       val intent = Intent(context, AlarmSchedulerRingService::class.java).apply {
         action = ACTION_START
         putExtra(EXTRA_ALARM_ID, alarmId)
         putExtra(EXTRA_IS_BACKUP, isBackup)
+        putExtra(EXTRA_OCCURRENCE_ID, occurrenceId)
       }
       return runCatching {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

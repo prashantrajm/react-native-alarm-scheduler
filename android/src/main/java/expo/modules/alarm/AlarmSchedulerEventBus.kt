@@ -31,13 +31,22 @@ internal object AlarmSchedulerEventBus {
     listener?.onAlarmAction(AlarmSchedulerJson.toMap(action))
   }
 
-  fun emitStateChange(alarmId: String, state: String, metadata: JSONObject?) {
+  fun emitStateChange(
+    alarmId: String,
+    state: String,
+    metadata: JSONObject?,
+    occurrence: JSONObject? = null
+  ) {
     val event = JSONObject()
       .put("id", alarmId)
       .put("state", state)
       .put("timestamp", System.currentTimeMillis())
     if (metadata != null) {
       event.put("metadata", metadata)
+    }
+    occurrence?.let {
+      event.put("occurrenceId", it.optString("occurrenceId"))
+      event.put("relationship", it.optString("relationship"))
     }
     listener?.onAlarmStateChange(AlarmSchedulerJson.toMap(event))
   }

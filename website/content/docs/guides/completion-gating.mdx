@@ -10,8 +10,8 @@ A normal alarm has a stop button. A completion-gated alarm does not: the only wa
 that opens your app **while the alarm keeps ringing**, and the ring stops when your app calls
 `completeNativeAlarmAsync()`.
 
-This is the mode you want for wake-up verification, medication confirmations, shift check-ins, or
-anything where "the user pressed stop" is not proof they did the thing.
+Use this mode when the app must confirm completion before the alarm stops and pressing a native stop
+control is not sufficient.
 
 <Steps>
 
@@ -39,12 +39,6 @@ await AlarmScheduler.scheduleAlarmAsync({
 ```
 
 `maxRingDurationSeconds: 0` disables Android's ring timeout, so nothing but your app ends the alarm.
-
-<Callout>
-This mode was previously called `openMissionOnly`. That spelling is still accepted — on both
-platforms and for alarms already persisted by an older build — and will be removed in a future
-major. Whichever you pass, `getNativeAlarmDebugStateAsync()` reports the canonical `openAppOnly`.
-</Callout>
 
 </Step>
 

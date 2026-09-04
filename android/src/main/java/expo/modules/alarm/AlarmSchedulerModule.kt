@@ -151,6 +151,10 @@ class AlarmSchedulerModule : Module() {
       AlarmSchedulerScheduler.cancelBackups(context, alarmId)
       AlarmSchedulerRingService.complete(context, alarmId)
       AlarmSchedulerStore.clearActionsForAlarm(context, alarmId)
+      AlarmSchedulerOccurrenceStore.all(context, alarmId).forEach { occurrence ->
+        val phase = if (occurrence.optString("phase") == "ringing") "completed" else "cancelled"
+        AlarmSchedulerOccurrenceStore.updatePhase(context, occurrence.optString("occurrenceId"), phase)
+      }
       // A completed one-shot alarm has nothing left to schedule, so drop it from the native store
       // rather than leaving it in getScheduledAlarmsAsync() forever. Repeating alarms stay: they
       // already hold the next occurrence.
@@ -159,6 +163,18 @@ class AlarmSchedulerModule : Module() {
         AlarmSchedulerStore.removeAlarm(context, alarmId)
         AlarmSchedulerSoundStore.delete(context, alarmId)
       }
+    }
+
+    AsyncFunction("resolveAlarmOccurrenceAsync") { occurrenceId: String, resolution: AlarmOccurrenceResolutionRecord ->
+      AlarmSchedulerOccurrenceManager.resolve(requireContext(), occurrenceId, resolution)
+    }
+
+    AsyncFunction("getAlarmOccurrencesAsync") { alarmId: String? ->
+      AlarmSchedulerOccurrenceStore.all(requireContext(), alarmId).map(AlarmSchedulerJson::toMap)
+    }
+
+    AsyncFunction("cancelAlarmOccurrenceAsync") { occurrenceId: String ->
+      AlarmSchedulerOccurrenceManager.cancel(requireContext(), occurrenceId)
     }
 
     AsyncFunction("scheduleNativeAlarmBackupAsync") { alarmId: String, delaySeconds: Double? ->
@@ -279,6 +295,25 @@ class AlarmSchedulerModule : Module() {
         return alarmContext(stored, "alerting")
       }
     }
+    AlarmSchedulerOccurrenceStore.all(context)
+      .firstOrNull {
+        it.optString("relationship") != "primary" &&
+          it.optString("phase") == "scheduled" &&
+          it.optLong("scheduledFor") > System.currentTimeMillis()
+      }
+      ?.let { occurrence ->
+        val alarmId = occurrence.optString("alarmId")
+        AlarmSchedulerStore.alarm(context, alarmId)?.let { stored ->
+          val result = alarmContext(stored, "countdown").toMutableMap()
+          result["occurrenceId"] = occurrence.optString("occurrenceId")
+          result["nativeAlarmId"] = occurrence.optString("occurrenceId")
+          result["relationship"] = occurrence.optString("relationship")
+          occurrence.optJSONObject("metadata")?.let {
+            result["metadata"] = AlarmSchedulerJson.toMap(it)
+          }
+          return result
+        }
+      }
     return recentFiredAlarmContext(context)
   }
 
@@ -301,11 +336,20 @@ class AlarmSchedulerModule : Module() {
   }
 
   private fun alarmContext(stored: JSONObject, state: String): Map<String, Any> {
+    val alarmId = stored.optString("id")
     val result = mutableMapOf<String, Any>(
-      "id" to stored.optString("id"),
+      "id" to alarmId,
       "state" to state
     )
     stored.optJSONObject("metadata")?.let { result["metadata"] = AlarmSchedulerJson.toMap(it) }
+    AlarmSchedulerOccurrenceStore.all(requireContext(), alarmId)
+      .firstOrNull { it.optString("phase") == "ringing" }
+      ?.let { occurrence ->
+        result["occurrenceId"] = occurrence.optString("occurrenceId")
+        result["nativeAlarmId"] = occurrence.optString("occurrenceId")
+        result["relationship"] = occurrence.optString("relationship", "primary")
+        occurrence.optJSONObject("metadata")?.let { result["metadata"] = AlarmSchedulerJson.toMap(it) }
+      }
     return result
   }
 

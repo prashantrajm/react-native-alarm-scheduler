@@ -150,6 +150,7 @@ The guarantee is absolute on Android and best-effort on iOS — see
 | Custom alarm sound | ✅ | ✅ physical device; system default in Simulator |
 | Ring until the app says stop (`openAppOnly`) | ✅ | ⚠️ |
 | Cold-launch handoff, action records, backup alarms | ✅ | ✅ |
+| Deferred and follow-up alarm occurrences | ✅ | ✅ |
 | Survive reboot | ✅ | ✅ |
 | Create an alarm in the system Clock app | ✅ | ❌ |
 | Open the system alarm app | ✅ | ❌ |
@@ -160,6 +161,26 @@ cannot remove; `stopIntentBehavior: 'rescheduleImmediate'` re-arms behind it.
 
 On web, `scheduleAlarmAsync` and `setSystemAlarmAsync` throw; every other method resolves to an
 explicit unavailable or no-op result, so a universal app still compiles and runs.
+
+## Deferred and follow-up occurrences
+
+Resolve a ringing occurrence and create its next delivery without re-registering the alarm
+definition in application code:
+
+```ts
+await AlarmScheduler.resolveAlarmOccurrenceAsync(occurrenceId, {
+  outcome: 'deferred',
+  next: {
+    delaySeconds: 5 * 60,
+    relationship: 'deferred',
+  },
+  idempotencyKey: `defer:${occurrenceId}:1`,
+});
+```
+
+Use `relationship: 'followUp'` with `outcome: 'completed'` to schedule another delivery after the
+current occurrence is complete. See
+[Alarm occurrences](https://react-native-alarm-scheduler.vercel.app/api/occurrences).
 
 ## Contributing
 

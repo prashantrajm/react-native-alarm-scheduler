@@ -38,15 +38,9 @@ export type AlarmMetadata = Record<string, AlarmMetadataValue>;
  * `default` shows a stop button. `openAppOnly` removes it, leaving a single button that opens
  * your app while the alarm keeps ringing; only `completeNativeAlarmAsync()` ends the ring.
  *
- * `openMissionOnly` is the former name of `openAppOnly` and is still accepted.
- *
  * @see https://react-native-alarm-scheduler.vercel.app/guides/completion-gating
  */
-export type AlarmAlertActionMode =
-  | "default"
-  | "openAppOnly"
-  /** @deprecated Use `openAppOnly`. Still accepted; will be removed in a future major. */
-  | "openMissionOnly";
+export type AlarmAlertActionMode = "default" | "openAppOnly";
 
 export type IosAlarmOptions = {
   metadata?: AlarmMetadata;
@@ -164,6 +158,8 @@ export type AlarmScheduleInput = {
 
 export type ScheduledAlarm = {
   id: string;
+  occurrenceId?: string;
+  relationship?: AlarmOccurrenceRelationship;
   hour: number;
   minute: number;
   title: string;
@@ -184,10 +180,54 @@ export type AlarmContext = {
   metadata?: AlarmMetadata;
   state?: AlarmContextState;
   nativeAlarmId?: string;
+  /** The concrete scheduled instance. Equal to `id` for a primary occurrence. */
+  occurrenceId?: string;
+  relationship?: AlarmOccurrenceRelationship;
+};
+
+/** How a scheduled occurrence relates to the alarm definition that created it. */
+export type AlarmOccurrenceRelationship = "primary" | "deferred" | "followUp";
+
+export type AlarmOccurrencePhase =
+  | "scheduled"
+  | "ringing"
+  | "completed"
+  | "cancelled";
+
+/** A concrete native delivery of a durable alarm definition. */
+export type AlarmOccurrence = {
+  occurrenceId: string;
+  alarmId: string;
+  parentOccurrenceId?: string;
+  scheduledFor: number;
+  relationship: AlarmOccurrenceRelationship;
+  phase: AlarmOccurrencePhase;
+  metadata?: AlarmMetadata;
+};
+
+export type AlarmOccurrenceResolution = {
+  outcome: "completed" | "deferred";
+  next?: {
+    delaySeconds: number;
+    relationship: "deferred" | "followUp";
+    metadata?: AlarmMetadata;
+  };
+  /** Makes retries return the first result instead of scheduling another occurrence. */
+  idempotencyKey?: string;
+};
+
+export type AlarmOccurrenceResolutionResult = {
+  alarmId: string;
+  resolvedOccurrenceId: string;
+  outcome: "completed" | "deferred";
+  status: "resolved" | "resolvedWithoutNext";
+  nextOccurrence?: AlarmOccurrence;
 };
 
 export type AlarmStateChange = {
   id: string;
+  occurrenceId?: string;
+  relationship?: AlarmOccurrenceRelationship;
   state: AlarmContextState;
   timestamp: number;
   metadata?: AlarmMetadata;
@@ -201,7 +241,6 @@ export type NativeAlarmDebugState = {
   pendingHandoff?: AlarmAction | null;
   intentDebugCounts?: Record<string, number>;
   currentContext: AlarmContext | null;
-  /** Always reported in canonical form, even when scheduled with the legacy `openMissionOnly`. */
   alertActionMode?: "default" | "openAppOnly";
   stopButtonIncluded?: boolean;
   secondaryButtonIncluded?: boolean;

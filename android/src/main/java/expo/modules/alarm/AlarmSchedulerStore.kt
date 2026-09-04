@@ -223,6 +223,22 @@ internal object AlarmSchedulerStore {
     prefs(context).edit().putString(KEY_RETRY_IDS, all.toString()).apply()
   }
 
+  fun removeRetryAlarmId(context: Context, retryAlarmId: String, alarmId: String) {
+    val all = retryIdsByAlarmId(context)
+    val existing = all.optJSONArray(alarmId) ?: return
+    val remaining = JSONArray()
+    (0 until existing.length())
+      .map { existing.optString(it) }
+      .filter { it.isNotBlank() && it != retryAlarmId }
+      .forEach(remaining::put)
+    if (remaining.length() == 0) {
+      all.remove(alarmId)
+    } else {
+      all.put(alarmId, remaining)
+    }
+    prefs(context).edit().putString(KEY_RETRY_IDS, all.toString()).apply()
+  }
+
   private fun retryIdsByAlarmId(context: Context): JSONObject {
     val raw = prefs(context).getString(KEY_RETRY_IDS, null) ?: return JSONObject()
     return runCatching { JSONObject(raw) }.getOrDefault(JSONObject())

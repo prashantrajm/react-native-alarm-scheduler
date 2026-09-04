@@ -19,6 +19,8 @@ type AlarmContext = {
   metadata?: AlarmMetadata;
   state?: 'scheduled' | 'alerting' | 'countdown' | 'paused';
   nativeAlarmId?: string;
+  occurrenceId?: string;
+  relationship?: 'primary' | 'deferred' | 'followUp';
 };
 ```
 
@@ -28,7 +30,8 @@ logical alarm id and `nativeAlarmId` contains the backup UUID. If a one-shot ala
 AlarmKit already removed it from the daemon store, the package can still return the stored metadata
 for a short recovery window.
 
-On **Android** this returns the currently ringing alarm with `state: 'alerting'`, falling back to a
+On **Android** this returns the currently ringing alarm with `state: 'alerting'`, a waiting deferred
+or follow-up occurrence with `state: 'countdown'`, then falls back to a
 one-shot alarm that fired within the last hour and was never completed — the same recovery window as
 iOS.
 

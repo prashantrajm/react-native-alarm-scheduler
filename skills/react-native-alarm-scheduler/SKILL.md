@@ -71,11 +71,31 @@ tracks cannot be imported because the app never receives their audio bytes. iOS 
 system default sound because its ToneLibrary can crash SpringBoard for external AlarmKit sounds;
 verify custom iOS playback on a physical device.
 
+## Deferred and follow-up occurrences
+
+Use `resolveAlarmOccurrenceAsync` when an active alarm should stop and optionally produce another
+delivery. Do not reproduce the native stop, completion reset, definition restoration, and timer
+ordering in application code.
+
+```ts
+await AlarmScheduler.resolveAlarmOccurrenceAsync(occurrenceId, {
+  outcome: 'deferred',
+  next: {
+    delaySeconds: 5 * 60,
+    relationship: 'deferred',
+  },
+  idempotencyKey: `defer:${occurrenceId}:1`,
+});
+```
+
+Use the returned `occurrenceId` with `cancelAlarmOccurrenceAsync`; do not cancel every backup for the
+alarm when only one occurrence should be removed. Reconcile persisted state with
+`getAlarmOccurrencesAsync()` after cold launch.
+
 ## Completion-gated alarms
 
-An alarm that keeps ringing until the app confirms the user finished something. `openAppOnly` was
-previously called `openMissionOnly`; the old spelling is still accepted, but write new code with
-`openAppOnly`.
+An alarm that keeps ringing until the app confirms the user finished something. Use
+`alertActionMode: 'openAppOnly'` to remove the native stop action.
 
 ```ts
 await AlarmScheduler.scheduleAlarmAsync({

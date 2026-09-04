@@ -119,6 +119,17 @@ enum AlarmSchedulerNativeAlarmStore {
     UserDefaults.standard.set(allRetryIds, forKey: retryIdsKey)
   }
 
+  static func removeRetryAlarmId(_ retryAlarmId: String, for alarmId: String) {
+    var allRetryIds = retryIdsByAlarmId()
+    let remaining = (allRetryIds[alarmId] ?? []).filter { $0 != retryAlarmId }
+    if remaining.isEmpty {
+      allRetryIds.removeValue(forKey: alarmId)
+    } else {
+      allRetryIds[alarmId] = remaining
+    }
+    UserDefaults.standard.set(allRetryIds, forKey: retryIdsKey)
+  }
+
   private static func retryIdsByAlarmId() -> [String: [String]] {
     UserDefaults.standard.dictionary(forKey: retryIdsKey) as? [String: [String]] ?? [:]
   }

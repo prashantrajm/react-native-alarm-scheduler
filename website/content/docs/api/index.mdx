@@ -51,6 +51,14 @@ All types are also exported as named exports from the same module.
 | [`resetNativeAlarmCompletionAsync(alarmId)`](/api/completion-and-backup#resetnativealarmcompletionasync) | `void` |
 | [`clearBypassAsync(alarmId)`](/api/completion-and-backup#clearbypassasync) | `void` |
 
+## Alarm occurrences
+
+| Method | Returns |
+| --- | --- |
+| [`resolveAlarmOccurrenceAsync(occurrenceId, resolution)`](/api/occurrences#resolvealarmoccurrenceasyncoccurrenceid-resolution) | `AlarmOccurrenceResolutionResult` |
+| [`getAlarmOccurrencesAsync(alarmId?)`](/api/occurrences#getalarmoccurrencesasyncalarmid) | `AlarmOccurrence[]` |
+| [`cancelAlarmOccurrenceAsync(occurrenceId)`](/api/occurrences#cancelalarmoccurrenceasyncoccurrenceid) | `boolean` |
+
 ## System Clock (Android)
 
 | Method | Returns |
