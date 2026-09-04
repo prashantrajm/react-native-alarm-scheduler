@@ -20,7 +20,7 @@ export type AlarmPermissionResponse = {
   canPostNotifications?: boolean;
 };
 
-export type ExpoAlarmModuleEvents = {
+export type AlarmSchedulerModuleEvents = {
   onAlarmTriggered: (alarm: ScheduledAlarm) => void;
   onAlarmAction: (action: AlarmAction) => void;
   onAlarmStateChange: (event: AlarmStateChange) => void;

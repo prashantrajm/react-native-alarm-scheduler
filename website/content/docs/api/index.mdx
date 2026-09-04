@@ -3,10 +3,13 @@ title: Overview
 description: Every method exposed by the default export, grouped by what it does.
 ---
 
-The package has a single default export:
+The package exposes the alarm API as its default export and as the named `AlarmScheduler` export:
 
 ```ts
-import ExpoAlarm from 'react-native-alarm-scheduler';
+import AlarmScheduler from 'react-native-alarm-scheduler';
+
+// Equivalent:
+import { AlarmScheduler } from 'react-native-alarm-scheduler';
 ```
 
 All types are also exported as named exports from the same module.

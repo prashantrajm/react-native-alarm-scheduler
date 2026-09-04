@@ -5,13 +5,13 @@ import type {
   AlarmAction,
   AlarmContext,
   AlarmScheduleInput,
-  ExpoAlarmModuleEvents,
+  AlarmSchedulerModuleEvents,
   NativeAlarmBackupResult,
   NativeAlarmDebugState,
   ScheduledAlarm,
-} from "./ExpoAlarm.types";
+} from "./AlarmScheduler.types";
 
-class ExpoAlarmModule extends NativeModule<ExpoAlarmModuleEvents> {
+class AlarmSchedulerModule extends NativeModule<AlarmSchedulerModuleEvents> {
   async getPermissionsAsync(): Promise<AlarmPermissionResponse> {
     return this.unavailablePermission();
   }
@@ -124,4 +124,9 @@ class ExpoAlarmModule extends NativeModule<ExpoAlarmModuleEvents> {
   }
 }
 
-export default registerWebModule(ExpoAlarmModule, "ExpoAlarm");
+export const AlarmScheduler = registerWebModule(
+  AlarmSchedulerModule,
+  "AlarmScheduler",
+);
+
+export default AlarmScheduler;

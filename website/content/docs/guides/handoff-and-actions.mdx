@@ -27,8 +27,8 @@ Run this on cold launch and on every foreground:
 
 ```ts
 async function reconcileAlarms() {
-  const handoff = await ExpoAlarm.getPendingNativeAlarmHandoffAsync();
-  const context = handoff ? null : await ExpoAlarm.getCurrentAlarmContextAsync();
+  const handoff = await AlarmScheduler.getPendingNativeAlarmHandoffAsync();
+  const context = handoff ? null : await AlarmScheduler.getCurrentAlarmContextAsync();
   const alarmId = handoff?.alarmId ?? context?.id;
 
   if (!alarmId) return;
@@ -36,11 +36,11 @@ async function reconcileAlarms() {
   if (handoff?.action === 'nativeStop') {
     // The user pressed the system stop control. Not proof of completion —
     // re-arm before presenting UI.
-    await ExpoAlarm.scheduleNativeAlarmBackupAsync(alarmId, 0.1);
+    await AlarmScheduler.scheduleNativeAlarmBackupAsync(alarmId, 0.1);
   }
 
   router.replace(`/alarm/${alarmId}`);
-  await ExpoAlarm.clearPendingNativeAlarmHandoffAsync();
+  await AlarmScheduler.clearPendingNativeAlarmHandoffAsync();
 }
 ```
 
@@ -55,7 +55,7 @@ action history — use `clearPendingAlarmActionsAsync(ids?)` for that.
 ## Action records
 
 ```ts
-const actions = await ExpoAlarm.getPendingAlarmActionsAsync();
+const actions = await AlarmScheduler.getPendingAlarmActionsAsync();
 ```
 
 Each record carries an `action` of `nativeStop`, `secondaryOpen`, `snooze` or `dismiss`, plus
@@ -70,14 +70,14 @@ Two fields are Android-only:
 Clear records once consumed:
 
 ```ts
-await ExpoAlarm.clearPendingAlarmActionsAsync(actions.map((a) => a.id));
-await ExpoAlarm.clearPendingAlarmActionsAsync(); // or clear everything
+await AlarmScheduler.clearPendingAlarmActionsAsync(actions.map((a) => a.id));
+await AlarmScheduler.clearPendingAlarmActionsAsync(); // or clear everything
 ```
 
 ## Events are a bonus, not the mechanism
 
 ```ts
-const subscription = ExpoAlarm.addListener('onAlarmTriggered', (alarm) => {
+const subscription = AlarmScheduler.addListener('onAlarmTriggered', (alarm) => {
   console.log(alarm);
 });
 

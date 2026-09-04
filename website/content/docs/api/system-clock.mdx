@@ -11,7 +11,7 @@ Android only. Sends an `AlarmClock.ACTION_SET_ALARM` intent to create an alarm i
 app. Returns `false` if no compatible Clock activity is available.
 
 ```ts
-const created = await ExpoAlarm.setSystemAlarmAsync({
+const created = await AlarmScheduler.setSystemAlarmAsync({
   hour: 8,
   minute: 0,
   title: 'Leave for work',
@@ -34,7 +34,7 @@ iOS does not expose a public API for creating alarms in the system Clock app, so
 Opens the Android system Clock alarm screen via `AlarmClock.ACTION_SHOW_ALARMS`.
 
 ```ts
-const opened = await ExpoAlarm.openSystemAlarmAppAsync();
+const opened = await AlarmScheduler.openSystemAlarmAppAsync();
 ```
 
 On iOS this uses a best-effort Clock URL and may return `false` or do nothing depending on the OS

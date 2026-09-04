@@ -5,13 +5,13 @@ import type {
   AlarmAction,
   AlarmContext,
   AlarmScheduleInput,
-  ExpoAlarmModuleEvents,
+  AlarmSchedulerModuleEvents,
   NativeAlarmBackupResult,
   NativeAlarmDebugState,
   ScheduledAlarm,
-} from "./ExpoAlarm.types";
+} from "./AlarmScheduler.types";
 
-declare class ExpoAlarmModule extends NativeModule<ExpoAlarmModuleEvents> {
+declare class AlarmSchedulerModule extends NativeModule<AlarmSchedulerModuleEvents> {
   getPermissionsAsync(): Promise<AlarmPermissionResponse>;
   requestPermissionsAsync(): Promise<AlarmPermissionResponse>;
   openAlarmSettingsAsync(): Promise<boolean>;
@@ -39,5 +39,7 @@ declare class ExpoAlarmModule extends NativeModule<ExpoAlarmModuleEvents> {
   openSystemAlarmAppAsync(): Promise<boolean>;
 }
 
-// This call loads the native module object from the JSI.
-export default requireNativeModule<ExpoAlarmModule>("ExpoAlarm");
+export const AlarmScheduler =
+  requireNativeModule<AlarmSchedulerModule>("AlarmScheduler");
+
+export default AlarmScheduler;

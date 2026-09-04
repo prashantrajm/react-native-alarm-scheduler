@@ -10,7 +10,7 @@ import { Callout } from 'fumadocs-ui/components/callout';
 Schedules an app-owned native alarm and returns the stored alarm.
 
 ```ts
-const scheduled = await ExpoAlarm.scheduleAlarmAsync({
+const scheduled = await AlarmScheduler.scheduleAlarmAsync({
   id: '00000000-0000-4000-8000-000000000001',
   hour: 7,
   minute: 30,
@@ -152,7 +152,7 @@ when omitted. An app written against the AlarmKit flow behaves the same on Andro
 Cancels an app-owned alarm by id. Returns `true` when a native or stored alarm was removed.
 
 ```ts
-const removed = await ExpoAlarm.cancelAlarmAsync(alarmId);
+const removed = await AlarmScheduler.cancelAlarmAsync(alarmId);
 ```
 
 ## `getScheduledAlarmsAsync()`
@@ -160,5 +160,5 @@ const removed = await ExpoAlarm.cancelAlarmAsync(alarmId);
 Returns the app-owned alarms stored by this module.
 
 ```ts
-const alarms: ScheduledAlarm[] = await ExpoAlarm.getScheduledAlarmsAsync();
+const alarms: ScheduledAlarm[] = await AlarmScheduler.getScheduledAlarmsAsync();
 ```

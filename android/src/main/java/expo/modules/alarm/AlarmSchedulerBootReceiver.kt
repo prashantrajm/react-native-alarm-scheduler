@@ -9,7 +9,7 @@ import android.content.Intent
  * this, every scheduled alarm silently disappears — the single biggest reliability gap between a
  * toy implementation and a real one.
  */
-class ExpoAlarmBootReceiver : BroadcastReceiver() {
+class AlarmSchedulerBootReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent) {
     when (intent.action) {
       Intent.ACTION_BOOT_COMPLETED,
@@ -19,7 +19,7 @@ class ExpoAlarmBootReceiver : BroadcastReceiver() {
       Intent.ACTION_TIMEZONE_CHANGED -> {
         val pendingResult = goAsync()
         try {
-          ExpoAlarmScheduler.rescheduleAll(context)
+          AlarmSchedulerScheduler.rescheduleAll(context)
         } finally {
           pendingResult.finish()
         }

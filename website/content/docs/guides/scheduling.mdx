@@ -11,7 +11,7 @@ Pass `weekdays` for a repeating alarm, or leave it out for a one-shot:
 
 ```ts
 // Repeats every weekday at 07:30
-await ExpoAlarm.scheduleAlarmAsync({
+await AlarmScheduler.scheduleAlarmAsync({
   hour: 7,
   minute: 30,
   title: 'Standup',
@@ -19,7 +19,7 @@ await ExpoAlarm.scheduleAlarmAsync({
 });
 
 // Fires once, at the next 07:30
-await ExpoAlarm.scheduleAlarmAsync({ hour: 7, minute: 30 });
+await AlarmScheduler.scheduleAlarmAsync({ hour: 7, minute: 30 });
 ```
 
 Weekdays use ISO numbering: `1` is Monday through `7` is Sunday.
@@ -30,7 +30,7 @@ omitted, the module schedules the next occurrence matching `hour` and `minute`.
 ## Alarm ids
 
 ```ts
-await ExpoAlarm.scheduleAlarmAsync({ id: myId, hour: 7, minute: 0 });
+await AlarmScheduler.scheduleAlarmAsync({ id: myId, hour: 7, minute: 0 });
 ```
 
 Android accepts any string `id`. **iOS AlarmKit requires a UUID string** when you provide one. If you
@@ -49,7 +49,7 @@ An app already written against the AlarmKit flow gets the same behavior on Andro
 `android` block at all. Set `android` fields only where the two platforms should genuinely differ:
 
 ```ts
-await ExpoAlarm.scheduleAlarmAsync({
+await AlarmScheduler.scheduleAlarmAsync({
   hour: 7,
   minute: 0,
   ios: {
@@ -72,7 +72,7 @@ back on the fired alarm, on action records, and on the alarm context. Use it to 
 information:
 
 ```ts
-await ExpoAlarm.scheduleAlarmAsync({
+await AlarmScheduler.scheduleAlarmAsync({
   hour: 7,
   minute: 0,
   ios: { metadata: { route: 'alarm-detail', routine: 'morning' } },
@@ -90,8 +90,8 @@ See [Handoffs and actions](/guides/handoff-and-actions).
 ## Listing and cancelling
 
 ```ts
-const alarms = await ExpoAlarm.getScheduledAlarmsAsync();
-const removed = await ExpoAlarm.cancelAlarmAsync(alarms[0].id);
+const alarms = await AlarmScheduler.getScheduledAlarmsAsync();
+const removed = await AlarmScheduler.cancelAlarmAsync(alarms[0].id);
 ```
 
 `cancelAlarmAsync` returns `true` when a native or stored alarm was actually removed.

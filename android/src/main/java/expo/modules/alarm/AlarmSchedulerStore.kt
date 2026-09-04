@@ -7,23 +7,23 @@ import org.json.JSONObject
 import java.util.UUID
 
 /**
- * SharedPreferences-backed mirror of the iOS `ExpoAlarmNativeAlarmStore`.
+ * SharedPreferences-backed mirror of the iOS `AlarmSchedulerNativeAlarmStore`.
  *
  * Every key name and record shape matches the iOS implementation so the JS layer
  * can treat both platforms identically. The store is read from three processes'
  * worth of entry points (module, broadcast receiver, foreground service) which all
  * live in the same process, so plain `apply()` writes are enough.
  */
-internal object ExpoAlarmStore {
-  private const val PREFS_NAME = "expo_alarm_store"
+internal object AlarmSchedulerStore {
+  private const val PREFS_NAME = "alarm_scheduler_store"
   private const val ALARM_KEY_PREFIX = "alarm:"
-  private const val KEY_ACTIONS = "expo_alarm_actions"
-  private const val KEY_COMPLETIONS = "expo_alarm_completed_ids"
-  private const val KEY_RETRY_IDS = "expo_alarm_retry_ids_by_alarm"
-  private const val KEY_PENDING_HANDOFF = "expo_alarm_pending_handoff"
-  private const val KEY_INTENT_DEBUG_COUNTS = "expo_alarm_intent_debug_counts"
-  private const val KEY_ACTIVE_RING = "expo_alarm_active_ring"
-  private const val KEY_MIGRATED = "expo_alarm_migrated_v2"
+  private const val KEY_ACTIONS = "alarm_scheduler_actions"
+  private const val KEY_COMPLETIONS = "alarm_scheduler_completed_ids"
+  private const val KEY_RETRY_IDS = "alarm_scheduler_retry_ids_by_alarm"
+  private const val KEY_PENDING_HANDOFF = "alarm_scheduler_pending_handoff"
+  private const val KEY_INTENT_DEBUG_COUNTS = "alarm_scheduler_intent_debug_counts"
+  private const val KEY_ACTIVE_RING = "alarm_scheduler_active_ring"
+  private const val KEY_MIGRATED = "alarm_scheduler_migrated_v2"
 
   private val reservedKeys = setOf(
     KEY_ACTIONS,
@@ -127,7 +127,7 @@ internal object ExpoAlarmStore {
     actions(context).forEach(array::put)
     array.put(event)
     prefs(context).edit().putString(KEY_ACTIONS, array.toString()).apply()
-    ExpoAlarmEventBus.emitAction(event)
+    AlarmSchedulerEventBus.emitAction(event)
     return event
   }
 
@@ -234,7 +234,7 @@ internal object ExpoAlarmStore {
 
   fun intentDebugCounts(context: Context, alarmId: String): Map<String, Any> {
     val counts = intentDebugCountsByAlarmId(context).optJSONObject(alarmId) ?: return emptyMap()
-    return ExpoAlarmJson.toMap(counts)
+    return AlarmSchedulerJson.toMap(counts)
   }
 
   private fun incrementIntentInvocation(context: Context, action: String, alarmId: String) {
@@ -269,7 +269,7 @@ internal object ExpoAlarmStore {
   // endregion
 }
 
-internal object ExpoAlarmJson {
+internal object AlarmSchedulerJson {
   fun toMap(json: JSONObject?): Map<String, Any> {
     if (json == null) {
       return emptyMap()

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import ExpoAlarm, {
+import AlarmScheduler, {
   type AlarmAction,
   type AlarmContext,
   type NativeAlarmDebugState,
@@ -49,12 +49,12 @@ export default function App() {
         pendingActions,
         debug,
       ] = await Promise.all([
-        ExpoAlarm.getPermissionsAsync(),
-        ExpoAlarm.getScheduledAlarmsAsync(),
-        ExpoAlarm.getCurrentAlarmContextAsync(),
-        ExpoAlarm.getPendingNativeAlarmHandoffAsync(),
-        ExpoAlarm.getPendingAlarmActionsAsync(),
-        ExpoAlarm.getNativeAlarmDebugStateAsync(nextAlarmId),
+        AlarmScheduler.getPermissionsAsync(),
+        AlarmScheduler.getScheduledAlarmsAsync(),
+        AlarmScheduler.getCurrentAlarmContextAsync(),
+        AlarmScheduler.getPendingNativeAlarmHandoffAsync(),
+        AlarmScheduler.getPendingAlarmActionsAsync(),
+        AlarmScheduler.getNativeAlarmDebugStateAsync(nextAlarmId),
       ]);
 
       const nextSnapshot = {
@@ -73,19 +73,19 @@ export default function App() {
   );
 
   useEffect(() => {
-    const triggered = ExpoAlarm.addListener('onAlarmTriggered', (event) => {
+    const triggered = AlarmScheduler.addListener('onAlarmTriggered', (event) => {
       appendLog('event:onAlarmTriggered', event);
       if (event.id) {
         setAlarmId(event.id);
       }
     });
-    const action = ExpoAlarm.addListener('onAlarmAction', (event) => {
+    const action = AlarmScheduler.addListener('onAlarmAction', (event) => {
       appendLog('event:onAlarmAction', event);
       if (event.alarmId) {
         setAlarmId(event.alarmId);
       }
     });
-    const state = ExpoAlarm.addListener('onAlarmStateChange', (event) => {
+    const state = AlarmScheduler.addListener('onAlarmStateChange', (event) => {
       appendLog('event:onAlarmStateChange', event);
       if (event.id) {
         setAlarmId(event.id);
@@ -111,14 +111,14 @@ export default function App() {
   }, [alarmId, snapshot.currentContext, snapshot.pendingHandoff]);
 
   const schedulePrimary = useCallback(async () => {
-    await ExpoAlarm.cancelNativeAlarmBackupAsync(TEST_ALARM_ID);
-    await ExpoAlarm.cancelAlarmAsync(TEST_ALARM_ID);
-    await ExpoAlarm.clearPendingAlarmActionsAsync();
-    await ExpoAlarm.clearPendingNativeAlarmHandoffAsync();
-    await ExpoAlarm.resetNativeAlarmCompletionAsync(TEST_ALARM_ID);
+    await AlarmScheduler.cancelNativeAlarmBackupAsync(TEST_ALARM_ID);
+    await AlarmScheduler.cancelAlarmAsync(TEST_ALARM_ID);
+    await AlarmScheduler.clearPendingAlarmActionsAsync();
+    await AlarmScheduler.clearPendingNativeAlarmHandoffAsync();
+    await AlarmScheduler.resetNativeAlarmCompletionAsync(TEST_ALARM_ID);
 
     const nextMinute = new Date(Date.now() + 70_000);
-    const scheduled = await ExpoAlarm.scheduleAlarmAsync({
+    const scheduled = await AlarmScheduler.scheduleAlarmAsync({
       id: TEST_ALARM_ID,
       hour: nextMinute.getHours(),
       minute: nextMinute.getMinutes(),
@@ -157,25 +157,25 @@ export default function App() {
       state.currentContext?.metadata?.alarmId?.toString() ||
       state.currentContext?.id;
     const id = handoffAlarmId || contextAlarmId || currentAlarmId;
-    const result = await ExpoAlarm.scheduleNativeAlarmBackupAsync(id, 0.1);
+    const result = await AlarmScheduler.scheduleNativeAlarmBackupAsync(id, 0.1);
     setAlarmId(id);
     appendLog('backup armed', result);
     await inspect(id);
   }, [appendLog, currentAlarmId, inspect]);
 
   const completeAndCancel = useCallback(async () => {
-    await ExpoAlarm.completeNativeAlarmAsync(currentAlarmId);
-    await ExpoAlarm.cancelAlarmAsync(currentAlarmId);
+    await AlarmScheduler.completeNativeAlarmAsync(currentAlarmId);
+    await AlarmScheduler.cancelAlarmAsync(currentAlarmId);
     appendLog('completed and canceled', { alarmId: currentAlarmId });
     await inspect(currentAlarmId);
   }, [appendLog, currentAlarmId, inspect]);
 
   const clearState = useCallback(async () => {
-    await ExpoAlarm.cancelNativeAlarmBackupAsync(currentAlarmId);
-    await ExpoAlarm.cancelAlarmAsync(currentAlarmId);
-    await ExpoAlarm.clearPendingAlarmActionsAsync();
-    await ExpoAlarm.clearPendingNativeAlarmHandoffAsync();
-    await ExpoAlarm.resetNativeAlarmCompletionAsync(currentAlarmId);
+    await AlarmScheduler.cancelNativeAlarmBackupAsync(currentAlarmId);
+    await AlarmScheduler.cancelAlarmAsync(currentAlarmId);
+    await AlarmScheduler.clearPendingAlarmActionsAsync();
+    await AlarmScheduler.clearPendingNativeAlarmHandoffAsync();
+    await AlarmScheduler.resetNativeAlarmCompletionAsync(currentAlarmId);
     appendLog('cleared state', { alarmId: currentAlarmId });
     await inspect(currentAlarmId);
   }, [appendLog, currentAlarmId, inspect]);
@@ -189,7 +189,7 @@ export default function App() {
           <Button
             title="Request permissions"
             onPress={async () => {
-              const result = await ExpoAlarm.requestPermissionsAsync();
+              const result = await AlarmScheduler.requestPermissionsAsync();
               appendLog('permissions requested', result);
               await inspect();
             }}
@@ -222,7 +222,7 @@ export default function App() {
             <Button
               title="Open system alarm app"
               onPress={async () => {
-                await ExpoAlarm.openSystemAlarmAppAsync();
+                await AlarmScheduler.openSystemAlarmAppAsync();
               }}
             />
           </Group>

@@ -25,7 +25,7 @@ Add the file to the config plugin so prebuild copies it into the app bundle's Re
 Then reference it by its exact bundled filename, **including the extension**:
 
 ```ts
-await ExpoAlarm.scheduleAlarmAsync({
+await AlarmScheduler.scheduleAlarmAsync({
   hour: 7,
   minute: 0,
   ios: { soundName: 'bollywood-alarm.mp3' },
@@ -40,7 +40,7 @@ the system default sound.
 Put the file in `android/app/src/main/res/raw` and reference it by name — the extension is optional:
 
 ```ts
-await ExpoAlarm.scheduleAlarmAsync({
+await AlarmScheduler.scheduleAlarmAsync({
   hour: 7,
   minute: 0,
   android: { soundName: 'bollywood_alarm' },
@@ -50,7 +50,7 @@ await ExpoAlarm.scheduleAlarmAsync({
 Or pass any content or resource URI, which takes precedence over `soundName`:
 
 ```ts
-await ExpoAlarm.scheduleAlarmAsync({
+await AlarmScheduler.scheduleAlarmAsync({
   hour: 7,
   minute: 0,
   android: { soundUri: 'content://media/internal/audio/media/42' },
@@ -70,7 +70,7 @@ Playback loops on `STREAM_ALARM`, which ignores the ringer and Do Not Disturb. O
 package defends against the volume-down escape hatch:
 
 ```ts
-await ExpoAlarm.scheduleAlarmAsync({
+await AlarmScheduler.scheduleAlarmAsync({
   hour: 7,
   minute: 0,
   android: {

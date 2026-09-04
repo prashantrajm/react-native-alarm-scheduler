@@ -12,7 +12,7 @@ const path = require('path');
 
 const pkg = require('./package.json');
 
-const withExpoAlarm = (config, props = {}) => {
+const withAlarmScheduler = (config, props = {}) => {
   const alarmKitUsageDescription =
     props.alarmKitUsageDescription ||
     'Allow this app to schedule alarms that can alert you at the selected time.';
@@ -86,4 +86,4 @@ function normalizeIosAlarmSounds(value) {
   return value;
 }
 
-module.exports = createRunOncePlugin(withExpoAlarm, pkg.name, pkg.version);
+module.exports = createRunOncePlugin(withAlarmScheduler, pkg.name, pkg.version);

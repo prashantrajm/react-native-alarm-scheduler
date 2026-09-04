@@ -12,8 +12,8 @@
     "app.plugin.js",
     "build",
     "expo-module.config.json",
-    "ios/ExpoAlarm.podspec",
-    "ios/ExpoAlarmModule.swift",
+    "ios/AlarmScheduler.podspec",
+    "ios/AlarmSchedulerModule.swift",
     "skills",
     "src"
   ],
@@ -34,7 +34,7 @@
     "alarm",
     "alarmkit",
     "android-alarmmanager",
-    "ExpoAlarm"
+    "AlarmScheduler"
   ],
   "repository": {
     "type": "git",

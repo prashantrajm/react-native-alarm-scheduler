@@ -11,7 +11,7 @@ Marks the native alarm flow complete. Call this **only** after the user satisfie
 completion condition.
 
 ```ts
-await ExpoAlarm.completeNativeAlarmAsync(alarmId);
+await AlarmScheduler.completeNativeAlarmAsync(alarmId);
 ```
 
 It does all of the following:
@@ -35,7 +35,7 @@ Schedules a short backup alarm for an existing logical alarm id â€” an AlarmKit 
 exact `setAlarmClock` on Android.
 
 ```ts
-const backup = await ExpoAlarm.scheduleNativeAlarmBackupAsync(alarmId, 0.1);
+const backup = await AlarmScheduler.scheduleNativeAlarmBackupAsync(alarmId, 0.1);
 ```
 
 ```ts
@@ -60,7 +60,7 @@ Cancels the deterministic backup timer for a logical alarm id and removes any le
 tracked by older package versions.
 
 ```ts
-const cancelled = await ExpoAlarm.cancelNativeAlarmBackupAsync(alarmId);
+const cancelled = await AlarmScheduler.cancelNativeAlarmBackupAsync(alarmId);
 ```
 
 ## `resetNativeAlarmCompletionAsync(alarmId)`
@@ -69,7 +69,7 @@ Clears the completion marker for an alarm id, allowing `rescheduleImmediate` ret
 id. Use this when a repeating alarm needs to arm again after a previous completion.
 
 ```ts
-await ExpoAlarm.resetNativeAlarmCompletionAsync(alarmId);
+await AlarmScheduler.resetNativeAlarmCompletionAsync(alarmId);
 ```
 
 ## `clearBypassAsync(alarmId)`
@@ -78,5 +78,5 @@ Older alias for `resetNativeAlarmCompletionAsync(alarmId)`. Identical behavior â
 name for clarity.
 
 ```ts
-await ExpoAlarm.clearBypassAsync(alarmId);
+await AlarmScheduler.clearBypassAsync(alarmId);
 ```

@@ -6,11 +6,11 @@
 
 - JS entry: `src/index.ts`
 - Android module: `android/src/main/java/expo/modules/alarm/`
-- iOS module: `ios/ExpoAlarmModule.swift`
+- iOS module: `ios/AlarmSchedulerModule.swift`
 - Config plugin: `app.plugin.js`
 - Example app: `example/`
 
-The public npm package name is `react-native-alarm-scheduler`; the native module name remains `ExpoAlarm`.
+The public npm package name is `react-native-alarm-scheduler`; the native module name is `AlarmScheduler`.
 
 ## Native Boundaries
 

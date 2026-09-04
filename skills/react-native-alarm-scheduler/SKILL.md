@@ -30,7 +30,7 @@ exact-alarm grant the ringing foreground service cannot legally start, so the al
 notification. Never call `scheduleAlarmAsync` without checking.
 
 ```ts
-const p = await ExpoAlarm.requestPermissionsAsync();
+const p = await AlarmScheduler.requestPermissionsAsync();
 if (!p.canScheduleExactAlarms) return; // route the user to settings, explain why
 ```
 
@@ -39,12 +39,12 @@ when a JS runtime is alive — which is usually false for a 7am alarm. Everythin
 natively. Reconcile on **every launch and every foreground**:
 
 ```ts
-const handoff = await ExpoAlarm.getPendingNativeAlarmHandoffAsync();
-const context = handoff ? null : await ExpoAlarm.getCurrentAlarmContextAsync();
+const handoff = await AlarmScheduler.getPendingNativeAlarmHandoffAsync();
+const context = handoff ? null : await AlarmScheduler.getCurrentAlarmContextAsync();
 const alarmId = handoff?.alarmId ?? context?.id;
 if (alarmId) {
   router.replace(`/alarm/${alarmId}`);
-  await ExpoAlarm.clearPendingNativeAlarmHandoffAsync();
+  await AlarmScheduler.clearPendingNativeAlarmHandoffAsync();
 }
 ```
 
@@ -71,7 +71,7 @@ previously called `openMissionOnly`; the old spelling is still accepted, but wri
 `openAppOnly`.
 
 ```ts
-await ExpoAlarm.scheduleAlarmAsync({
+await AlarmScheduler.scheduleAlarmAsync({
   id: uuid,
   hour: 7,
   minute: 0,

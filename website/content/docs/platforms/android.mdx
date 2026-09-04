@@ -23,10 +23,10 @@ takeover.
 </Callout>
 
 ```ts
-const p = await ExpoAlarm.getPermissionsAsync();
+const p = await AlarmScheduler.getPermissionsAsync();
 
 if (!p.canScheduleExactAlarms) {
-  await ExpoAlarm.requestPermissionsAsync();
+  await AlarmScheduler.requestPermissionsAsync();
 }
 ```
 
@@ -50,10 +50,10 @@ Android 14 gates full-screen notifications behind a per-app grant. Apps whose de
 alarm clock get it by default; others must ask.
 
 ```ts
-const p = await ExpoAlarm.getPermissionsAsync();
+const p = await AlarmScheduler.getPermissionsAsync();
 
 if (p.canUseFullScreenIntent === false) {
-  await ExpoAlarm.openFullScreenIntentSettingsAsync();
+  await AlarmScheduler.openFullScreenIntentSettingsAsync();
 }
 ```
 
@@ -94,7 +94,7 @@ disable battery optimization for your app and to allow autostart.
 ## Inspecting live state
 
 ```ts
-const state = await ExpoAlarm.getNativeAlarmDebugStateAsync(alarmId);
+const state = await AlarmScheduler.getNativeAlarmDebugStateAsync(alarmId);
 // state.isRinging, state.isScheduled,
 // state.canUseFullScreenIntent, state.canScheduleExactAlarms
 ```

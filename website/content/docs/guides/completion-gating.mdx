@@ -20,7 +20,7 @@ anything where "the user pressed stop" is not proof they did the thing.
 ### Schedule with `openAppOnly`
 
 ```ts
-await ExpoAlarm.scheduleAlarmAsync({
+await AlarmScheduler.scheduleAlarmAsync({
   id: alarmId, // must be a UUID string on iOS
   hour: 7,
   minute: 0,
@@ -56,13 +56,13 @@ Do this on cold launch **and** on every foreground. The handoff slot is written 
 any JS listener runs, which makes it the right source for app-launch routing:
 
 ```ts
-const handoff = await ExpoAlarm.getPendingNativeAlarmHandoffAsync();
-const context = handoff ? null : await ExpoAlarm.getCurrentAlarmContextAsync();
+const handoff = await AlarmScheduler.getPendingNativeAlarmHandoffAsync();
+const context = handoff ? null : await AlarmScheduler.getCurrentAlarmContextAsync();
 const alarmId = handoff?.alarmId ?? context?.id;
 
 if (alarmId) {
   router.replace(`/alarm/${alarmId}`);
-  await ExpoAlarm.clearPendingNativeAlarmHandoffAsync();
+  await AlarmScheduler.clearPendingNativeAlarmHandoffAsync();
 }
 ```
 
@@ -73,8 +73,8 @@ if (alarmId) {
 ### Complete only when the user actually finishes
 
 ```ts
-await ExpoAlarm.completeNativeAlarmAsync(alarmId);
-await ExpoAlarm.cancelAlarmAsync(alarmId); // then reschedule if the alarm repeats
+await AlarmScheduler.completeNativeAlarmAsync(alarmId);
+await AlarmScheduler.cancelAlarmAsync(alarmId); // then reschedule if the alarm repeats
 ```
 
 `completeNativeAlarmAsync` stops future native stop intents from scheduling backup alarms for that
@@ -115,7 +115,7 @@ Use [`getNativeAlarmDebugStateAsync`](/api/debugging) to check which presentatio
 gave you:
 
 ```ts
-const state = await ExpoAlarm.getNativeAlarmDebugStateAsync(alarmId);
+const state = await AlarmScheduler.getNativeAlarmDebugStateAsync(alarmId);
 
 if (state.alertActionMode === 'openAppOnly' && state.alertInitializer === 'legacyStopButton') {
   // The runtime required the legacy stop-button presentation. The package
@@ -128,7 +128,7 @@ if (state.alertActionMode === 'openAppOnly' && state.alertInitializer === 'legac
 If your app processes a handoff and needs a moment before it can present its UI, re-arm explicitly:
 
 ```ts
-await ExpoAlarm.scheduleNativeAlarmBackupAsync(handoff.alarmId, 0.1);
+await AlarmScheduler.scheduleNativeAlarmBackupAsync(handoff.alarmId, 0.1);
 ```
 
 Calling this repeatedly replaces the same backup timer instead of stacking new ones. See

@@ -32,12 +32,12 @@ struct IosAlarmOptionsRecord: Record {
   @Field var soundName: String?
 }
 
-private enum ExpoAlarmNativeAlarmStore {
-  private static let actionsKey = "expo_alarm_actions"
-  private static let completionsKey = "expo_alarm_completed_ids"
-  private static let retryIdsKey = "expo_alarm_retry_ids_by_alarm"
-  private static let pendingHandoffKey = "expo_alarm_pending_handoff"
-  private static let intentDebugCountsKey = "expo_alarm_intent_debug_counts"
+private enum AlarmSchedulerNativeAlarmStore {
+  private static let actionsKey = "alarm_scheduler_actions"
+  private static let completionsKey = "alarm_scheduler_completed_ids"
+  private static let retryIdsKey = "alarm_scheduler_retry_ids_by_alarm"
+  private static let pendingHandoffKey = "alarm_scheduler_pending_handoff"
+  private static let intentDebugCountsKey = "alarm_scheduler_intent_debug_counts"
   static let actionRecordedNotification = Notification.Name("expo.modules.alarm.actionRecorded")
 
   static func all() -> [[String: Any]] {
@@ -174,19 +174,19 @@ private enum ExpoAlarmNativeAlarmStore {
 
 #if canImport(AlarmKit)
 @available(iOS 26.0, *)
-private struct ExpoAlarmMetadata: AlarmMetadata {
+private struct AlarmSchedulerMetadata: AlarmMetadata {
   let alarmId: String
   let title: String
-  let values: [String: ExpoAlarmMetadataValue]
+  let values: [String: AlarmSchedulerMetadataValue]
 }
 
 @available(iOS 26.0, *)
-private struct ExpoAlarmAlertPresentationResult {
+private struct AlarmSchedulerAlertPresentationResult {
   let alert: AlarmPresentation.Alert
   let debugState: [String: Any]
 }
 
-private enum ExpoAlarmMetadataValue: Codable, Hashable, Sendable {
+private enum AlarmSchedulerMetadataValue: Codable, Hashable, Sendable {
   case string(String)
   case number(Double)
   case bool(Bool)
@@ -216,7 +216,7 @@ private enum ExpoAlarmMetadataValue: Codable, Hashable, Sendable {
 }
 
 @available(iOS 26.0, *)
-struct ExpoAlarmStopIntent: LiveActivityIntent {
+struct AlarmSchedulerStopIntent: LiveActivityIntent {
   static var title: LocalizedStringResource = "Stop Alarm"
   static var authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed
   static var supportedModes: IntentModes { .foreground(.immediate) }
@@ -257,16 +257,16 @@ struct ExpoAlarmStopIntent: LiveActivityIntent {
   }
 
   func perform() async throws -> some IntentResult {
-    let shouldReschedule = behavior == "rescheduleImmediate" && !ExpoAlarmNativeAlarmStore.isComplete(alarmId: alarmId)
+    let shouldReschedule = behavior == "rescheduleImmediate" && !AlarmSchedulerNativeAlarmStore.isComplete(alarmId: alarmId)
     var details: [String: Any] = [
       "foregroundRequested": true
     ]
     if shouldReschedule {
-      let backupResult = await ExpoAlarmRescheduler.scheduleBackup(
+      let backupResult = await AlarmSchedulerRescheduler.scheduleBackup(
         originalAlarmId: alarmId,
         title: alarmTitle,
         soundName: soundName.isEmpty ? nil : soundName,
-        delaySeconds: ExpoAlarmRescheduler.defaultBackupDelaySeconds
+        delaySeconds: AlarmSchedulerRescheduler.defaultBackupDelaySeconds
       )
       details["rescheduled"] = backupResult.scheduled
       details["rescheduledAlarmId"] = backupResult.backupAlarmId
@@ -277,13 +277,13 @@ struct ExpoAlarmStopIntent: LiveActivityIntent {
         details["backupScheduledFor"] = scheduledFor
       }
     }
-    _ = ExpoAlarmNativeAlarmStore.recordIntentHandoff(alarmId: alarmId, action: "nativeStop", details: details)
+    _ = AlarmSchedulerNativeAlarmStore.recordIntentHandoff(alarmId: alarmId, action: "nativeStop", details: details)
     return .result()
   }
 }
 
 @available(iOS 26.0, *)
-struct ExpoAlarmSecondaryOpenIntent: LiveActivityIntent {
+struct AlarmSchedulerSecondaryOpenIntent: LiveActivityIntent {
   static var title: LocalizedStringResource = "Open Alarm"
   static var authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed
   static var supportedModes: IntentModes { .foreground(.immediate) }
@@ -300,13 +300,13 @@ struct ExpoAlarmSecondaryOpenIntent: LiveActivityIntent {
   }
 
   func perform() async throws -> some IntentResult {
-    _ = ExpoAlarmNativeAlarmStore.recordIntentHandoff(alarmId: alarmId, action: "secondaryOpen")
+    _ = AlarmSchedulerNativeAlarmStore.recordIntentHandoff(alarmId: alarmId, action: "secondaryOpen")
     return .result()
   }
 }
 
 @available(iOS 26.0, *)
-struct ExpoAlarmSecondaryRecordIntent: LiveActivityIntent {
+struct AlarmSchedulerSecondaryRecordIntent: LiveActivityIntent {
   static var title: LocalizedStringResource = "Record Alarm Action"
   static var authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed
   static var supportedModes: IntentModes { .background }
@@ -323,13 +323,13 @@ struct ExpoAlarmSecondaryRecordIntent: LiveActivityIntent {
   }
 
   func perform() async throws -> some IntentResult {
-    _ = ExpoAlarmNativeAlarmStore.recordIntentHandoff(alarmId: alarmId, action: "secondaryOpen")
+    _ = AlarmSchedulerNativeAlarmStore.recordIntentHandoff(alarmId: alarmId, action: "secondaryOpen")
     return .result()
   }
 }
 
 @available(iOS 26.0, *)
-private struct ExpoAlarmBackupScheduleResult {
+private struct AlarmSchedulerBackupScheduleResult {
   let alarmId: String
   let backupAlarmId: String
   let scheduled: Bool
@@ -351,7 +351,7 @@ private struct ExpoAlarmBackupScheduleResult {
 }
 
 @available(iOS 26.0, *)
-private enum ExpoAlarmRescheduler {
+private enum AlarmSchedulerRescheduler {
   static let defaultBackupDelaySeconds: Double = 0.1
 
   static func decodeWeekdays(_ value: String) -> [Int] {
@@ -393,10 +393,10 @@ private enum ExpoAlarmRescheduler {
     title: String,
     soundName: String?,
     delaySeconds: Double
-  ) async -> ExpoAlarmBackupScheduleResult {
+  ) async -> AlarmSchedulerBackupScheduleResult {
     let normalizedDelaySeconds = max(0.1, delaySeconds)
     guard let alarmID = backupAlarmId(for: originalAlarmId) else {
-      return ExpoAlarmBackupScheduleResult(
+      return AlarmSchedulerBackupScheduleResult(
         alarmId: originalAlarmId,
         backupAlarmId: "",
         scheduled: false,
@@ -411,7 +411,7 @@ private enum ExpoAlarmRescheduler {
       let presentation = AlarmPresentation(
         alert: makeAlertPresentation(title: title)
       )
-      let metadata = ExpoAlarmMetadata(
+      let metadata = AlarmSchedulerMetadata(
         alarmId: originalAlarmId,
         title: title,
         values: [
@@ -431,7 +431,7 @@ private enum ExpoAlarmRescheduler {
         configuration: AlarmManager.AlarmConfiguration.timer(
           duration: normalizedDelaySeconds,
           attributes: attributes,
-          stopIntent: ExpoAlarmStopIntent(
+          stopIntent: AlarmSchedulerStopIntent(
             alarmId: originalAlarmId,
             behavior: "rescheduleImmediate",
             title: title,
@@ -440,12 +440,12 @@ private enum ExpoAlarmRescheduler {
             weekdays: [],
             soundName: soundName
           ),
-          secondaryIntent: ExpoAlarmSecondaryOpenIntent(alarmId: originalAlarmId),
+          secondaryIntent: AlarmSchedulerSecondaryOpenIntent(alarmId: originalAlarmId),
           sound: makeAlarmSound(soundName)
         )
       )
-      ExpoAlarmNativeAlarmStore.addRetryAlarmId(backupAlarmId, for: originalAlarmId)
-      return ExpoAlarmBackupScheduleResult(
+      AlarmSchedulerNativeAlarmStore.addRetryAlarmId(backupAlarmId, for: originalAlarmId)
+      return AlarmSchedulerBackupScheduleResult(
         alarmId: originalAlarmId,
         backupAlarmId: backupAlarmId,
         scheduled: true,
@@ -453,7 +453,7 @@ private enum ExpoAlarmRescheduler {
         delaySeconds: normalizedDelaySeconds
       )
     } catch {
-      return ExpoAlarmBackupScheduleResult(
+      return AlarmSchedulerBackupScheduleResult(
         alarmId: originalAlarmId,
         backupAlarmId: backupAlarmId,
         scheduled: false,
@@ -479,7 +479,7 @@ private enum ExpoAlarmRescheduler {
 }
 #endif
 
-public class ExpoAlarmModule: Module {
+public class AlarmSchedulerModule: Module {
   private var alarmActionObserver: NSObjectProtocol?
   private var alarmUpdatesTask: Task<Void, Never>?
 
@@ -491,7 +491,7 @@ public class ExpoAlarmModule: Module {
   }
 
   public func definition() -> ModuleDefinition {
-    Name("ExpoAlarm")
+    Name("AlarmScheduler")
 
     Events("onAlarmTriggered", "onAlarmAction", "onAlarmStateChange")
 
@@ -535,25 +535,25 @@ public class ExpoAlarmModule: Module {
     }
 
     AsyncFunction("getPendingAlarmActionsAsync") { () -> [[String: Any]] in
-      return ExpoAlarmNativeAlarmStore.all()
+      return AlarmSchedulerNativeAlarmStore.all()
     }
 
     AsyncFunction("clearPendingAlarmActionsAsync") { (ids: [String]?) -> Void in
-      ExpoAlarmNativeAlarmStore.clear(ids: ids)
+      AlarmSchedulerNativeAlarmStore.clear(ids: ids)
     }
 
     AsyncFunction("getPendingNativeAlarmHandoffAsync") { () -> [String: Any]? in
-      return ExpoAlarmNativeAlarmStore.pendingHandoff()
+      return AlarmSchedulerNativeAlarmStore.pendingHandoff()
     }
 
     AsyncFunction("clearPendingNativeAlarmHandoffAsync") { () -> Void in
-      ExpoAlarmNativeAlarmStore.clearPendingHandoff()
+      AlarmSchedulerNativeAlarmStore.clearPendingHandoff()
     }
 
     AsyncFunction("completeNativeAlarmAsync") { (alarmId: String) async -> Void in
-      ExpoAlarmNativeAlarmStore.complete(alarmId: alarmId)
+      AlarmSchedulerNativeAlarmStore.complete(alarmId: alarmId)
       await self.cancelNativeAndRetryAlarms(originalAlarmId: alarmId)
-      ExpoAlarmNativeAlarmStore.clearActions(alarmId: alarmId)
+      AlarmSchedulerNativeAlarmStore.clearActions(alarmId: alarmId)
     }
 
     AsyncFunction("scheduleNativeAlarmBackupAsync") { (alarmId: String, delaySeconds: Double?) async -> [String: Any] in
@@ -565,21 +565,21 @@ public class ExpoAlarmModule: Module {
     }
 
     AsyncFunction("clearBypassAsync") { (alarmId: String) -> Void in
-      ExpoAlarmNativeAlarmStore.resetCompletion(alarmId: alarmId)
+      AlarmSchedulerNativeAlarmStore.resetCompletion(alarmId: alarmId)
     }
 
     AsyncFunction("resetNativeAlarmCompletionAsync") { (alarmId: String) -> Void in
-      ExpoAlarmNativeAlarmStore.resetCompletion(alarmId: alarmId)
+      AlarmSchedulerNativeAlarmStore.resetCompletion(alarmId: alarmId)
     }
 
     AsyncFunction("getNativeAlarmDebugStateAsync") { (alarmId: String) -> [String: Any] in
       var state: [String: Any] = [
         "alarmId": alarmId,
-        "isComplete": ExpoAlarmNativeAlarmStore.isComplete(alarmId: alarmId),
-        "activeRetryAlarmIds": ExpoAlarmNativeAlarmStore.retryAlarmIds(for: alarmId),
-        "pendingActions": ExpoAlarmNativeAlarmStore.all().filter { ($0["alarmId"] as? String) == alarmId },
-        "pendingHandoff": ExpoAlarmNativeAlarmStore.pendingHandoff() as Any,
-        "intentDebugCounts": ExpoAlarmNativeAlarmStore.intentDebugCounts(alarmId: alarmId),
+        "isComplete": AlarmSchedulerNativeAlarmStore.isComplete(alarmId: alarmId),
+        "activeRetryAlarmIds": AlarmSchedulerNativeAlarmStore.retryAlarmIds(for: alarmId),
+        "pendingActions": AlarmSchedulerNativeAlarmStore.all().filter { ($0["alarmId"] as? String) == alarmId },
+        "pendingHandoff": AlarmSchedulerNativeAlarmStore.pendingHandoff() as Any,
+        "intentDebugCounts": AlarmSchedulerNativeAlarmStore.intentDebugCounts(alarmId: alarmId),
         "currentContext": self.currentAlarmContext() as Any
       ]
       if let storedAlarm = self.storedAlarms().first(where: { ($0["id"] as? String) == alarmId }),
@@ -627,7 +627,7 @@ public class ExpoAlarmModule: Module {
       return
     }
     alarmActionObserver = NotificationCenter.default.addObserver(
-      forName: ExpoAlarmNativeAlarmStore.actionRecordedNotification,
+      forName: AlarmSchedulerNativeAlarmStore.actionRecordedNotification,
       object: nil,
       queue: .main
     ) { [weak self] notification in
@@ -709,7 +709,7 @@ public class ExpoAlarmModule: Module {
 
   private func schedule(_ alarm: AlarmScheduleRecord) async throws -> [String: Any] {
     let id = alarm.id?.isEmpty == false ? alarm.id! : UUID().uuidString
-    ExpoAlarmNativeAlarmStore.resetCompletion(alarmId: id)
+    AlarmSchedulerNativeAlarmStore.resetCompletion(alarmId: id)
     let hour = try requireHour(alarm.hour)
     let minute = try requireMinute(alarm.minute)
     let title = alarm.title?.isEmpty == false ? alarm.title! : "Alarm"
@@ -758,23 +758,23 @@ public class ExpoAlarmModule: Module {
         try? AlarmManager.shared.cancel(id: uuid)
         didCancelNativeAlarm = true
       }
-      if let backupId = ExpoAlarmRescheduler.backupAlarmId(for: id) {
+      if let backupId = AlarmSchedulerRescheduler.backupAlarmId(for: id) {
         try? AlarmManager.shared.cancel(id: backupId)
         didCancelNativeAlarm = true
       }
-      for retryAlarmId in ExpoAlarmNativeAlarmStore.retryAlarmIds(for: id) {
+      for retryAlarmId in AlarmSchedulerNativeAlarmStore.retryAlarmIds(for: id) {
         guard let uuid = UUID(uuidString: retryAlarmId) else {
           continue
         }
         try? AlarmManager.shared.cancel(id: uuid)
         didCancelNativeAlarm = true
       }
-      ExpoAlarmNativeAlarmStore.clearRetryAlarmIds(for: id)
+      AlarmSchedulerNativeAlarmStore.clearRetryAlarmIds(for: id)
     }
     #endif
 
-    ExpoAlarmNativeAlarmStore.resetCompletion(alarmId: id)
-    ExpoAlarmNativeAlarmStore.clearActions(alarmId: id)
+    AlarmSchedulerNativeAlarmStore.resetCompletion(alarmId: id)
+    AlarmSchedulerNativeAlarmStore.clearActions(alarmId: id)
     let didRemoveStoredAlarm = remove(id: id)
     return didCancelNativeAlarm || didRemoveStoredAlarm
   }
@@ -785,16 +785,16 @@ public class ExpoAlarmModule: Module {
       if let uuid = UUID(uuidString: originalAlarmId) {
         try? AlarmManager.shared.cancel(id: uuid)
       }
-      if let backupId = ExpoAlarmRescheduler.backupAlarmId(for: originalAlarmId) {
+      if let backupId = AlarmSchedulerRescheduler.backupAlarmId(for: originalAlarmId) {
         try? AlarmManager.shared.cancel(id: backupId)
       }
-      for retryAlarmId in ExpoAlarmNativeAlarmStore.retryAlarmIds(for: originalAlarmId) {
+      for retryAlarmId in AlarmSchedulerNativeAlarmStore.retryAlarmIds(for: originalAlarmId) {
         guard let uuid = UUID(uuidString: retryAlarmId) else {
           continue
         }
         try? AlarmManager.shared.cancel(id: uuid)
       }
-      ExpoAlarmNativeAlarmStore.clearRetryAlarmIds(for: originalAlarmId)
+      AlarmSchedulerNativeAlarmStore.clearRetryAlarmIds(for: originalAlarmId)
     }
     #endif
   }
@@ -802,21 +802,21 @@ public class ExpoAlarmModule: Module {
   private func scheduleNativeAlarmBackup(alarmId: String, delaySeconds: Double?) async -> [String: Any] {
     #if canImport(AlarmKit)
     if #available(iOS 26.0, *) {
-      guard !ExpoAlarmNativeAlarmStore.isComplete(alarmId: alarmId) else {
+      guard !AlarmSchedulerNativeAlarmStore.isComplete(alarmId: alarmId) else {
         return [
           "alarmId": alarmId,
-          "backupAlarmId": ExpoAlarmRescheduler.backupAlarmId(for: alarmId)?.uuidString ?? "",
+          "backupAlarmId": AlarmSchedulerRescheduler.backupAlarmId(for: alarmId)?.uuidString ?? "",
           "scheduled": false,
-          "delaySeconds": delaySeconds ?? ExpoAlarmRescheduler.defaultBackupDelaySeconds
+          "delaySeconds": delaySeconds ?? AlarmSchedulerRescheduler.defaultBackupDelaySeconds
         ]
       }
       let title = storedAlarms().first(where: { ($0["id"] as? String) == alarmId })?["title"] as? String ?? "Alarm"
       let soundName = storedAlarms().first(where: { ($0["id"] as? String) == alarmId })?["iosSoundName"] as? String
-      return await ExpoAlarmRescheduler.scheduleBackup(
+      return await AlarmSchedulerRescheduler.scheduleBackup(
         originalAlarmId: alarmId,
         title: title,
         soundName: soundName,
-        delaySeconds: delaySeconds ?? ExpoAlarmRescheduler.defaultBackupDelaySeconds
+        delaySeconds: delaySeconds ?? AlarmSchedulerRescheduler.defaultBackupDelaySeconds
       ).dictionary
     }
     #endif
@@ -834,18 +834,18 @@ public class ExpoAlarmModule: Module {
 
     #if canImport(AlarmKit)
     if #available(iOS 26.0, *) {
-      if let backupId = ExpoAlarmRescheduler.backupAlarmId(for: alarmId) {
+      if let backupId = AlarmSchedulerRescheduler.backupAlarmId(for: alarmId) {
         try? AlarmManager.shared.cancel(id: backupId)
         didCancel = true
       }
-      for retryAlarmId in ExpoAlarmNativeAlarmStore.retryAlarmIds(for: alarmId) {
+      for retryAlarmId in AlarmSchedulerNativeAlarmStore.retryAlarmIds(for: alarmId) {
         guard let uuid = UUID(uuidString: retryAlarmId) else {
           continue
         }
         try? AlarmManager.shared.cancel(id: uuid)
         didCancel = true
       }
-      ExpoAlarmNativeAlarmStore.clearRetryAlarmIds(for: alarmId)
+      AlarmSchedulerNativeAlarmStore.clearRetryAlarmIds(for: alarmId)
     }
     #endif
 
@@ -860,7 +860,7 @@ public class ExpoAlarmModule: Module {
       let backupIdByPrimaryId = Dictionary(uniqueKeysWithValues: storedAlarms().compactMap { alarm -> (String, String)? in
         guard
           let id = alarm["id"] as? String,
-          let backupId = ExpoAlarmRescheduler.backupAlarmId(for: id)?.uuidString
+          let backupId = AlarmSchedulerRescheduler.backupAlarmId(for: id)?.uuidString
         else {
           return nil
         }
@@ -948,7 +948,7 @@ public class ExpoAlarmModule: Module {
     )
     let attributes = AlarmAttributes(
       presentation: presentation,
-      metadata: ExpoAlarmMetadata(alarmId: id, title: title, values: alarmKitMetadataValues(metadata)),
+      metadata: AlarmSchedulerMetadata(alarmId: id, title: title, values: alarmKitMetadataValues(metadata)),
       tintColor: Color.accentColor
     )
     let schedule = try makeAlarmKitSchedule(hour: hour, minute: minute, weekdays: weekdays)
@@ -990,7 +990,7 @@ public class ExpoAlarmModule: Module {
     secondaryButtonBehavior: AlarmPresentation.Alert.SecondaryButtonBehavior?,
     stopIntentBehavior: String,
     secondaryButtonBehaviorName: String
-  ) -> ExpoAlarmAlertPresentationResult {
+  ) -> AlarmSchedulerAlertPresentationResult {
     let runtimeSupportsSecondaryOnlyAlert: Bool
     if #available(iOS 26.1, *) {
       runtimeSupportsSecondaryOnlyAlert = true
@@ -1009,7 +1009,7 @@ public class ExpoAlarmModule: Module {
     ]
     if alertActionMode == "openAppOnly" {
       if #available(iOS 26.1, *) {
-        return ExpoAlarmAlertPresentationResult(
+        return AlarmSchedulerAlertPresentationResult(
           alert: AlarmPresentation.Alert(
             title: LocalizedStringResource(stringLiteral: title),
             secondaryButton: secondaryButton,
@@ -1019,7 +1019,7 @@ public class ExpoAlarmModule: Module {
         )
       }
     }
-    return ExpoAlarmAlertPresentationResult(
+    return AlarmSchedulerAlertPresentationResult(
       alert: AlarmPresentation.Alert(
         title: LocalizedStringResource(stringLiteral: title),
         stopButton: AlarmButton(text: LocalizedStringResource(stringLiteral: stopButtonTitle), textColor: .white, systemImageName: "stop.fill"),
@@ -1080,7 +1080,7 @@ public class ExpoAlarmModule: Module {
   ) -> (any LiveActivityIntent)? {
     switch behavior ?? "recordOnly" {
     case "recordOnly", "openApp", "rescheduleImmediate":
-      return ExpoAlarmStopIntent(
+      return AlarmSchedulerStopIntent(
         alarmId: id,
         behavior: behavior ?? "recordOnly",
         title: title,
@@ -1098,9 +1098,9 @@ public class ExpoAlarmModule: Module {
   private func makeSecondaryIntent(id: String, behavior: String?) -> (any LiveActivityIntent)? {
     switch behavior ?? "openApp" {
     case "openApp":
-      return ExpoAlarmSecondaryOpenIntent(alarmId: id)
+      return AlarmSchedulerSecondaryOpenIntent(alarmId: id)
     case "recordOnly":
-      return ExpoAlarmSecondaryRecordIntent(alarmId: id)
+      return AlarmSchedulerSecondaryRecordIntent(alarmId: id)
     default:
       return nil
     }
@@ -1296,24 +1296,24 @@ public class ExpoAlarmModule: Module {
 
   private func storedAlarms() -> [[String: Any]] {
     let defaults = UserDefaults.standard
-    guard let store = defaults.dictionary(forKey: "expo_alarm_store") as? [String: [String: Any]] else {
+    guard let store = defaults.dictionary(forKey: "alarm_scheduler_store") as? [String: [String: Any]] else {
       return []
     }
     return Array(store.values)
   }
 
   private func save(alarm: [String: Any]) {
-    var store = UserDefaults.standard.dictionary(forKey: "expo_alarm_store") as? [String: [String: Any]] ?? [:]
+    var store = UserDefaults.standard.dictionary(forKey: "alarm_scheduler_store") as? [String: [String: Any]] ?? [:]
     if let id = alarm["id"] as? String {
       store[id] = alarm
-      UserDefaults.standard.set(store, forKey: "expo_alarm_store")
+      UserDefaults.standard.set(store, forKey: "alarm_scheduler_store")
     }
   }
 
   private func remove(id: String) -> Bool {
-    var store = UserDefaults.standard.dictionary(forKey: "expo_alarm_store") as? [String: [String: Any]] ?? [:]
+    var store = UserDefaults.standard.dictionary(forKey: "alarm_scheduler_store") as? [String: [String: Any]] ?? [:]
     let existed = store.removeValue(forKey: id) != nil
-    UserDefaults.standard.set(store, forKey: "expo_alarm_store")
+    UserDefaults.standard.set(store, forKey: "alarm_scheduler_store")
     return existed
   }
 
@@ -1349,8 +1349,8 @@ public class ExpoAlarmModule: Module {
   }
 
   @available(iOS 26.0, *)
-  private func alarmKitMetadataValues(_ metadata: [String: Any]) -> [String: ExpoAlarmMetadataValue] {
-    var values: [String: ExpoAlarmMetadataValue] = [:]
+  private func alarmKitMetadataValues(_ metadata: [String: Any]) -> [String: AlarmSchedulerMetadataValue] {
+    var values: [String: AlarmSchedulerMetadataValue] = [:]
     metadata.forEach { key, value in
       if let value = value as? String {
         values[key] = .string(value)

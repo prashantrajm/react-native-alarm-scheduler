@@ -26,14 +26,14 @@ For route-specific behavior, put route context such as `alarmId` or a screen nam
 then read it back on launch and navigate from JavaScript:
 
 ```ts
-await ExpoAlarm.scheduleAlarmAsync({
+await AlarmScheduler.scheduleAlarmAsync({
   hour: 7,
   minute: 0,
   ios: { metadata: { route: 'alarm-detail' } },
 });
 
 // Later, on launch or resume:
-const context = await ExpoAlarm.getCurrentAlarmContextAsync();
+const context = await AlarmScheduler.getCurrentAlarmContextAsync();
 if (context?.metadata?.route) router.replace(String(context.metadata.route));
 ```
 
@@ -64,7 +64,7 @@ Intents. Treat strict completion enforcement as limited by public AlarmKit APIs,
 state to see what the runtime actually gave you:
 
 ```ts
-const state = await ExpoAlarm.getNativeAlarmDebugStateAsync(alarmId);
+const state = await AlarmScheduler.getNativeAlarmDebugStateAsync(alarmId);
 ```
 
 If `alertActionMode` is `openAppOnly` but `alertInitializer` is `legacyStopButton`, the runtime

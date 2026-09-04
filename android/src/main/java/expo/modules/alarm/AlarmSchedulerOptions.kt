@@ -32,7 +32,7 @@ internal const val FULL_SCREEN_TARGET_APP = "app"
  * `ios.metadata`, `ios.alertActionMode: 'openAppOnly'`,
  * `ios.stopIntentBehavior: 'rescheduleImmediate'` — behave the same on Android with no JS changes.
  */
-internal data class ExpoAlarmOptions(
+internal data class AlarmSchedulerOptions(
   val metadata: JSONObject,
   val alertTitle: String,
   val alertBody: String,
@@ -83,8 +83,8 @@ internal data class ExpoAlarmOptions(
       alarmId: String,
       android: AndroidAlarmOptionsRecord?,
       ios: IosAlarmOptionsRecord?
-    ): ExpoAlarmOptions {
-      val metadata = ExpoAlarmJson.fromMap(android?.metadata ?: ios?.metadata)
+    ): AlarmSchedulerOptions {
+      val metadata = AlarmSchedulerJson.fromMap(android?.metadata ?: ios?.metadata)
       metadata.put("alarmId", alarmId)
       metadata.put("title", title)
 
@@ -92,7 +92,7 @@ internal data class ExpoAlarmOptions(
       val secondaryButtonTitle = firstNonBlank(android?.secondaryButtonTitle, ios?.secondaryButtonTitle)
         ?: if (alertActionMode == ALERT_ACTION_MODE_OPEN_APP_ONLY) "Open app" else "Open"
 
-      return ExpoAlarmOptions(
+      return AlarmSchedulerOptions(
         metadata = metadata,
         alertTitle = firstNonBlank(android?.alertTitle, ios?.alertTitle) ?: title,
         alertBody = firstNonBlank(android?.alertBody) ?: "Alarm",
@@ -117,7 +117,7 @@ internal data class ExpoAlarmOptions(
       )
     }
 
-    fun fromJson(json: JSONObject?, title: String, alarmId: String): ExpoAlarmOptions {
+    fun fromJson(json: JSONObject?, title: String, alarmId: String): AlarmSchedulerOptions {
       if (json == null) {
         return resolve(title, alarmId, null, null)
       }
@@ -127,7 +127,7 @@ internal data class ExpoAlarmOptions(
         metadata.put("title", title)
       }
       val alertActionMode = normalizeAlertActionMode(json.optStringOrNull("alertActionMode"))
-      return ExpoAlarmOptions(
+      return AlarmSchedulerOptions(
         metadata = metadata,
         alertTitle = json.optStringOrNull("alertTitle") ?: title,
         alertBody = json.optStringOrNull("alertBody") ?: "Alarm",

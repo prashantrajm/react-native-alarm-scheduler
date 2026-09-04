@@ -34,7 +34,7 @@ import kotlin.math.roundToLong
  * them. Nothing but [ACTION_COMPLETE] (driven by `completeNativeAlarmAsync`), an explicit stop, or
  * the configured timeout can silence it — swiping notifications and pressing volume keys cannot.
  */
-class ExpoAlarmRingService : Service() {
+class AlarmSchedulerRingService : Service() {
   private var mediaPlayer: MediaPlayer? = null
   private var vibrator: Vibrator? = null
   private var wakeLock: PowerManager.WakeLock? = null
@@ -45,7 +45,7 @@ class ExpoAlarmRingService : Service() {
   private val handler = Handler(Looper.getMainLooper())
 
   private var alarmId: String? = null
-  private var options: ExpoAlarmOptions? = null
+  private var options: AlarmSchedulerOptions? = null
 
   override fun onBind(intent: Intent?): IBinder? = null
 
@@ -72,13 +72,13 @@ class ExpoAlarmRingService : Service() {
 
   private fun handleStart(intent: Intent) {
     val id = intent.getStringExtra(EXTRA_ALARM_ID)
-    val stored = id?.let { ExpoAlarmStore.alarm(this, it) }
+    val stored = id?.let { AlarmSchedulerStore.alarm(this, it) }
     if (id == null || stored == null) {
       stopRinging()
       return
     }
 
-    val resolved = ExpoAlarmOptions.fromJson(
+    val resolved = AlarmSchedulerOptions.fromJson(
       stored.optJSONObject("options"),
       stored.optString("title", "Alarm"),
       id
@@ -94,7 +94,7 @@ class ExpoAlarmRingService : Service() {
     alarmId = id
     options = resolved
     activeAlarmId = id
-    ExpoAlarmStore.setActiveRingAlarmId(this, id)
+    AlarmSchedulerStore.setActiveRingAlarmId(this, id)
 
     startForegroundNotification(id, resolved)
     acquireWakeLock(resolved)
@@ -106,17 +106,17 @@ class ExpoAlarmRingService : Service() {
 
     // The handoff record and onAlarmTriggered are emitted by the receiver before this service is
     // even asked to start, so they survive the service being refused.
-    ExpoAlarmEventBus.emitStateChange(id, "alerting", stored.optJSONObject("metadata"))
+    AlarmSchedulerEventBus.emitStateChange(id, "alerting", stored.optJSONObject("metadata"))
   }
 
   private fun resumeOrStop() {
-    val resumeId = ExpoAlarmStore.activeRingAlarmId(this)
-    if (resumeId == null || ExpoAlarmStore.isComplete(this, resumeId)) {
+    val resumeId = AlarmSchedulerStore.activeRingAlarmId(this)
+    if (resumeId == null || AlarmSchedulerStore.isComplete(this, resumeId)) {
       stopRinging()
       return
     }
     handleStart(
-      Intent(this, ExpoAlarmRingService::class.java).apply {
+      Intent(this, AlarmSchedulerRingService::class.java).apply {
         action = ACTION_START
         putExtra(EXTRA_ALARM_ID, resumeId)
       }
@@ -136,17 +136,17 @@ class ExpoAlarmRingService : Service() {
   /** An explicit stop from the notification action or the ring screen's stop button. */
   private fun handleUserStop(id: String?) {
     val currentId = id ?: alarmId ?: return stopRinging()
-    val resolved = options ?: ExpoAlarmOptions.fromJson(
-      ExpoAlarmStore.alarm(this, currentId)?.optJSONObject("options"),
-      ExpoAlarmStore.alarm(this, currentId)?.optString("title") ?: "Alarm",
+    val resolved = options ?: AlarmSchedulerOptions.fromJson(
+      AlarmSchedulerStore.alarm(this, currentId)?.optJSONObject("options"),
+      AlarmSchedulerStore.alarm(this, currentId)?.optString("title") ?: "Alarm",
       currentId
     )
     val details = mutableMapOf<String, Any?>("foregroundRequested" to true)
 
     val shouldReschedule = resolved.stopIntentBehavior == STOP_BEHAVIOR_RESCHEDULE &&
-      !ExpoAlarmStore.isComplete(this, currentId)
+      !AlarmSchedulerStore.isComplete(this, currentId)
     if (shouldReschedule) {
-      val backup = ExpoAlarmScheduler.scheduleBackup(this, currentId, resolved.backupDelaySeconds)
+      val backup = AlarmSchedulerScheduler.scheduleBackup(this, currentId, resolved.backupDelaySeconds)
       details["rescheduled"] = backup["scheduled"]
       details["rescheduledAlarmId"] = backup["backupAlarmId"]
       details["backupAlarmId"] = backup["backupAlarmId"]
@@ -157,7 +157,7 @@ class ExpoAlarmRingService : Service() {
       }
     }
 
-    ExpoAlarmStore.recordHandoff(this, currentId, "nativeStop", details = details)
+    AlarmSchedulerStore.recordHandoff(this, currentId, "nativeStop", details = details)
     if (resolved.stopIntentBehavior == STOP_BEHAVIOR_OPEN_APP) {
       openApp(currentId, resolved)
     }
@@ -168,7 +168,7 @@ class ExpoAlarmRingService : Service() {
   private fun handleOpen(id: String?) {
     val currentId = id ?: alarmId ?: return
     val resolved = options ?: return
-    ExpoAlarmStore.recordHandoff(
+    AlarmSchedulerStore.recordHandoff(
       context = this,
       alarmId = currentId,
       action = "secondaryOpen",
@@ -181,9 +181,9 @@ class ExpoAlarmRingService : Service() {
     val id = alarmId
     stopPlayback()
     activeAlarmId = null
-    ExpoAlarmStore.setActiveRingAlarmId(this, null)
+    AlarmSchedulerStore.setActiveRingAlarmId(this, null)
     if (id != null) {
-      ExpoAlarmEventBus.emitStateChange(id, "scheduled", ExpoAlarmStore.alarm(this, id)?.optJSONObject("metadata"))
+      AlarmSchedulerEventBus.emitStateChange(id, "scheduled", AlarmSchedulerStore.alarm(this, id)?.optJSONObject("metadata"))
     }
     stopForeground(STOP_FOREGROUND_REMOVE)
     stopSelf()
@@ -220,7 +220,7 @@ class ExpoAlarmRingService : Service() {
 
   // region audio
 
-  private fun startPlayback(options: ExpoAlarmOptions) {
+  private fun startPlayback(options: AlarmSchedulerOptions) {
     val attributes = AudioAttributes.Builder()
       .setUsage(AudioAttributes.USAGE_ALARM)
       .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -243,7 +243,7 @@ class ExpoAlarmRingService : Service() {
     }
   }
 
-  private fun candidateSoundUris(options: ExpoAlarmOptions): List<Uri> {
+  private fun candidateSoundUris(options: AlarmSchedulerOptions): List<Uri> {
     val candidates = mutableListOf<Uri>()
     options.soundUri?.let { runCatching { Uri.parse(it) }.getOrNull()?.let(candidates::add) }
     options.soundName?.let { name ->
@@ -263,7 +263,7 @@ class ExpoAlarmRingService : Service() {
    * The Android half of the audibility story: the alarm stream is pinned to the configured level
    * and re-pinned whenever anything (a volume key, another app) lowers it.
    */
-  private fun enforceAlarmVolume(options: ExpoAlarmOptions) {
+  private fun enforceAlarmVolume(options: AlarmSchedulerOptions) {
     if (!options.enforceVolume) {
       return
     }
@@ -299,7 +299,7 @@ class ExpoAlarmRingService : Service() {
     runCatching { audioManager.setStreamVolume(AudioManager.STREAM_ALARM, previous, 0) }
   }
 
-  private fun startVibration(options: ExpoAlarmOptions) {
+  private fun startVibration(options: AlarmSchedulerOptions) {
     if (!options.vibrate) {
       return
     }
@@ -332,7 +332,7 @@ class ExpoAlarmRingService : Service() {
     }
   }
 
-  private fun acquireWakeLock(options: ExpoAlarmOptions) {
+  private fun acquireWakeLock(options: AlarmSchedulerOptions) {
     val powerManager = getSystemService(PowerManager::class.java) ?: return
     val timeout = if (options.maxRingDurationSeconds > 0) {
       (options.maxRingDurationSeconds * 1000).roundToLong()
@@ -347,7 +347,7 @@ class ExpoAlarmRingService : Service() {
     }
   }
 
-  private fun scheduleTimeout(id: String, options: ExpoAlarmOptions) {
+  private fun scheduleTimeout(id: String, options: AlarmSchedulerOptions) {
     if (options.maxRingDurationSeconds <= 0) {
       return
     }
@@ -357,10 +357,10 @@ class ExpoAlarmRingService : Service() {
       }
       // Time-boxing the ring protects the battery, but an alarm the app never completed must
       // still come back when it asked for rescheduleImmediate.
-      if (options.stopIntentBehavior == STOP_BEHAVIOR_RESCHEDULE && !ExpoAlarmStore.isComplete(this, id)) {
-        ExpoAlarmScheduler.scheduleBackup(this, id, TIMEOUT_BACKUP_DELAY_SECONDS)
+      if (options.stopIntentBehavior == STOP_BEHAVIOR_RESCHEDULE && !AlarmSchedulerStore.isComplete(this, id)) {
+        AlarmSchedulerScheduler.scheduleBackup(this, id, TIMEOUT_BACKUP_DELAY_SECONDS)
       }
-      ExpoAlarmStore.record(this, id, "dismiss", details = mapOf("timedOut" to true))
+      AlarmSchedulerStore.record(this, id, "dismiss", details = mapOf("timedOut" to true))
       stopRinging()
     }
     timeoutRunnable = runnable
@@ -371,16 +371,16 @@ class ExpoAlarmRingService : Service() {
 
   // region presentation
 
-  private fun startForegroundNotification(id: String, options: ExpoAlarmOptions) {
-    val notification = ExpoAlarmNotifications.buildRingNotification(this, id, options)
+  private fun startForegroundNotification(id: String, options: AlarmSchedulerOptions) {
+    val notification = AlarmSchedulerNotifications.buildRingNotification(this, id, options)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
       startForeground(
-        ExpoAlarmNotifications.RING_NOTIFICATION_ID,
+        AlarmSchedulerNotifications.RING_NOTIFICATION_ID,
         notification,
         ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
       )
     } else {
-      startForeground(ExpoAlarmNotifications.RING_NOTIFICATION_ID, notification)
+      startForeground(AlarmSchedulerNotifications.RING_NOTIFICATION_ID, notification)
     }
   }
 
@@ -388,14 +388,14 @@ class ExpoAlarmRingService : Service() {
    * setAlarmClock grants a background activity-start allowance, so launching directly is both
    * legal and far more reliable than relying on the full-screen intent alone.
    */
-  private fun presentFullScreen(id: String, options: ExpoAlarmOptions, isBackup: Boolean) {
+  private fun presentFullScreen(id: String, options: AlarmSchedulerOptions, isBackup: Boolean) {
     if (!options.fullScreen) {
       return
     }
     val intent = if (options.fullScreenTarget == FULL_SCREEN_TARGET_APP) {
-      ExpoAlarmNotifications.appIntent(this, id, options)
+      AlarmSchedulerNotifications.appIntent(this, id, options)
     } else {
-      ExpoAlarmRingActivity.intent(this, id).putExtra(EXTRA_IS_BACKUP, isBackup)
+      AlarmSchedulerRingActivity.intent(this, id).putExtra(EXTRA_IS_BACKUP, isBackup)
     }
     if (intent == null) {
       return
@@ -403,8 +403,8 @@ class ExpoAlarmRingService : Service() {
     runCatching { startActivity(intent) }
   }
 
-  private fun openApp(id: String, options: ExpoAlarmOptions) {
-    val intent = ExpoAlarmNotifications.appIntent(this, id, options) ?: return
+  private fun openApp(id: String, options: AlarmSchedulerOptions) {
+    val intent = AlarmSchedulerNotifications.appIntent(this, id, options) ?: return
     runCatching { startActivity(intent) }
   }
 
@@ -418,7 +418,7 @@ class ExpoAlarmRingService : Service() {
     const val EXTRA_ALARM_ID = "expo.modules.alarm.extra.ALARM_ID"
     const val EXTRA_IS_BACKUP = "expo.modules.alarm.extra.RING_IS_BACKUP"
 
-    private const val WAKE_LOCK_TAG = "ExpoAlarm:ring"
+    private const val WAKE_LOCK_TAG = "AlarmScheduler:ring"
     private const val DEFAULT_WAKE_LOCK_TIMEOUT_MILLIS = 10 * 60 * 1000L
     private const val TIMEOUT_BACKUP_DELAY_SECONDS = 60.0
 
@@ -434,7 +434,7 @@ class ExpoAlarmRingService : Service() {
      * it, which is the one outcome an alarm library may never produce.
      */
     fun start(context: Context, alarmId: String, isBackup: Boolean): Boolean {
-      val intent = Intent(context, ExpoAlarmRingService::class.java).apply {
+      val intent = Intent(context, AlarmSchedulerRingService::class.java).apply {
         action = ACTION_START
         putExtra(EXTRA_ALARM_ID, alarmId)
         putExtra(EXTRA_IS_BACKUP, isBackup)
@@ -459,7 +459,7 @@ class ExpoAlarmRingService : Service() {
     }
 
     private fun send(context: Context, action: String, alarmId: String) {
-      val intent = Intent(context, ExpoAlarmRingService::class.java).apply {
+      val intent = Intent(context, AlarmSchedulerRingService::class.java).apply {
         this.action = action
         putExtra(EXTRA_ALARM_ID, alarmId)
       }

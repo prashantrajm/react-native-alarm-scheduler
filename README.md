@@ -76,29 +76,29 @@ All plugin options are listed in the [installation docs](https://react-native-al
 ## Usage
 
 ```ts
-import ExpoAlarm from 'react-native-alarm-scheduler';
+import AlarmScheduler from 'react-native-alarm-scheduler';
 
-const permissions = await ExpoAlarm.requestPermissionsAsync();
+const permissions = await AlarmScheduler.requestPermissionsAsync();
 
 if (permissions.canScheduleExactAlarms) {
-  const alarm = await ExpoAlarm.scheduleAlarmAsync({
+  const alarm = await AlarmScheduler.scheduleAlarmAsync({
     hour: 7,
     minute: 30,
     title: 'Morning alarm',
     weekdays: [1, 2, 3, 4, 5], // ISO: 1 = Monday, 7 = Sunday
   });
 
-  await ExpoAlarm.cancelAlarmAsync(alarm.id);
+  await AlarmScheduler.cancelAlarmAsync(alarm.id);
 }
 ```
 
 List and cancel what you scheduled:
 
 ```ts
-const alarms = await ExpoAlarm.getScheduledAlarmsAsync();
+const alarms = await AlarmScheduler.getScheduledAlarmsAsync();
 
 for (const alarm of alarms) {
-  await ExpoAlarm.cancelAlarmAsync(alarm.id);
+  await AlarmScheduler.cancelAlarmAsync(alarm.id);
 }
 ```
 
@@ -109,13 +109,13 @@ alive — which it is not on a cold launch from the lock screen. Everything they
 natively before any JS runs, so reconcile from the async getters on every launch and foreground:
 
 ```ts
-const handoff = await ExpoAlarm.getPendingNativeAlarmHandoffAsync();
-const context = handoff ? null : await ExpoAlarm.getCurrentAlarmContextAsync();
+const handoff = await AlarmScheduler.getPendingNativeAlarmHandoffAsync();
+const context = handoff ? null : await AlarmScheduler.getCurrentAlarmContextAsync();
 const alarmId = handoff?.alarmId ?? context?.id;
 
 if (alarmId) {
   router.replace(`/alarm/${alarmId}`);
-  await ExpoAlarm.clearPendingNativeAlarmHandoffAsync();
+  await AlarmScheduler.clearPendingNativeAlarmHandoffAsync();
 }
 ```
 
@@ -128,7 +128,7 @@ opens your app, and the alarm keeps ringing until you call `completeNativeAlarmA
 Useful when "the user pressed stop" is not proof of anything:
 
 ```ts
-await ExpoAlarm.scheduleAlarmAsync({
+await AlarmScheduler.scheduleAlarmAsync({
   hour: 7,
   minute: 0,
   title: 'Wake up',

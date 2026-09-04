@@ -15,13 +15,13 @@ import { Step, Steps } from 'fumadocs-ui/components/steps';
 Alarm scheduling is gated on both platforms. Always check before scheduling.
 
 ```ts
-import ExpoAlarm from 'react-native-alarm-scheduler';
+import AlarmScheduler from 'react-native-alarm-scheduler';
 
-const permissions = await ExpoAlarm.requestPermissionsAsync();
+const permissions = await AlarmScheduler.requestPermissionsAsync();
 
 if (!permissions.canScheduleExactAlarms) {
   // Send the user to settings and explain why the alarm needs this.
-  await ExpoAlarm.openAlarmSettingsAsync();
+  await AlarmScheduler.openAlarmSettingsAsync();
 }
 ```
 
@@ -35,7 +35,7 @@ iOS 26+ it requests AlarmKit authorization.
 ### Schedule an alarm
 
 ```ts
-const alarm = await ExpoAlarm.scheduleAlarmAsync({
+const alarm = await AlarmScheduler.scheduleAlarmAsync({
   hour: 7,
   minute: 30,
   title: 'Morning alarm',
@@ -59,13 +59,13 @@ Events only arrive when a JS runtime happens to be alive. The reliable pattern i
 the native records on every launch and foreground:
 
 ```ts
-const handoff = await ExpoAlarm.getPendingNativeAlarmHandoffAsync();
-const context = handoff ? null : await ExpoAlarm.getCurrentAlarmContextAsync();
+const handoff = await AlarmScheduler.getPendingNativeAlarmHandoffAsync();
+const context = handoff ? null : await AlarmScheduler.getCurrentAlarmContextAsync();
 const alarmId = handoff?.alarmId ?? context?.id;
 
 if (alarmId) {
   router.replace(`/alarm/${alarmId}`);
-  await ExpoAlarm.clearPendingNativeAlarmHandoffAsync();
+  await AlarmScheduler.clearPendingNativeAlarmHandoffAsync();
 }
 ```
 
@@ -76,10 +76,10 @@ if (alarmId) {
 ### List and cancel
 
 ```ts
-const alarms = await ExpoAlarm.getScheduledAlarmsAsync();
+const alarms = await AlarmScheduler.getScheduledAlarmsAsync();
 
 for (const alarm of alarms) {
-  await ExpoAlarm.cancelAlarmAsync(alarm.id);
+  await AlarmScheduler.cancelAlarmAsync(alarm.id);
 }
 ```
 

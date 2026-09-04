@@ -10,7 +10,7 @@ then belongs to the Clock app: it survives your app being uninstalled, and your 
 over it afterwards.
 
 ```ts
-const created = await ExpoAlarm.setSystemAlarmAsync({
+const created = await AlarmScheduler.setSystemAlarmAsync({
   hour: 8,
   minute: 0,
   title: 'Leave for work',
@@ -25,7 +25,7 @@ Returns `false` if no compatible Clock activity is available.
 Open the Clock app's alarm list:
 
 ```ts
-await ExpoAlarm.openSystemAlarmAppAsync();
+await AlarmScheduler.openSystemAlarmAppAsync();
 ```
 
 <Callout type="warn" title="iOS cannot do this">
