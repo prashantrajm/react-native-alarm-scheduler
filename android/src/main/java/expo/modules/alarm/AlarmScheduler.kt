@@ -27,7 +27,13 @@ internal object AlarmSchedulerScheduler {
     val minute = requireMinute(alarm.minute)
     val title = alarm.title?.takeIf { it.isNotBlank() } ?: "Alarm"
     val weekdays = normalizeWeekdays(alarm.weekdays)
-    val options = AlarmSchedulerOptions.resolve(title, id, alarm.android, alarm.ios)
+    var options = AlarmSchedulerOptions.resolve(title, id, alarm.soundUri, alarm.android, alarm.ios)
+    options = if (options.soundUri != null) {
+      options.copy(soundUri = AlarmSchedulerSoundStore.import(context, id, options.soundUri).toString())
+    } else {
+      AlarmSchedulerSoundStore.delete(context, id)
+      options
+    }
     val triggerAtMillis = alarm.timestamp?.toLong()?.takeIf { it > System.currentTimeMillis() }
       ?: nextTriggerAtMillis(hour, minute, weekdays)
 
@@ -60,6 +66,7 @@ internal object AlarmSchedulerScheduler {
     AlarmSchedulerStore.resetCompletion(context, id)
     AlarmSchedulerStore.clearActionsForAlarm(context, id)
     val removed = AlarmSchedulerStore.removeAlarm(context, id)
+    AlarmSchedulerSoundStore.delete(context, id)
     return existing != null || removed
   }
 
@@ -155,6 +162,7 @@ internal object AlarmSchedulerScheduler {
           // A one-shot alarm whose time passed while the device was off is dropped, matching the
           // behaviour of the system Clock app.
           AlarmSchedulerStore.removeAlarm(context, id)
+          AlarmSchedulerSoundStore.delete(context, id)
           return@forEach
         }
       }

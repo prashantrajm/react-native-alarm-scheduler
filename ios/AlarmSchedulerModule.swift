@@ -1,4 +1,5 @@
 import ExpoModulesCore
+import AVFoundation
 import Foundation
 import UIKit
 
@@ -7,6 +8,19 @@ import ActivityKit
 import AlarmKit
 import AppIntents
 import SwiftUI
+
+private func alarmSchedulerEffectiveSoundName(_ soundName: String?) -> String? {
+  #if targetEnvironment(simulator)
+  // iOS 26.x Simulator ToneLibrary crashes SpringBoard while preparing any external alarm tone:
+  // -[AVAudioSession reporterID]: unrecognized selector. Real devices do not use this fallback.
+  return nil
+  #else
+  guard let soundName, !soundName.isEmpty else {
+    return nil
+  }
+  return soundName
+  #endif
+}
 #endif
 
 struct AlarmScheduleRecord: Record {
@@ -17,6 +31,7 @@ struct AlarmScheduleRecord: Record {
   @Field var weekdays: [Int]?
   @Field var timestamp: Double?
   @Field var showUi: Bool = false
+  @Field var soundUri: String?
   @Field var ios: IosAlarmOptionsRecord?
 }
 
@@ -29,6 +44,7 @@ struct IosAlarmOptionsRecord: Record {
   @Field var countdownTitle: String?
   @Field var stopIntentBehavior: String?
   @Field var secondaryButtonBehavior: String?
+  @Field var soundUri: String?
   @Field var soundName: String?
 }
 
@@ -471,7 +487,7 @@ private enum AlarmSchedulerRescheduler {
   }
 
   private static func makeAlarmSound(_ soundName: String?) -> AlertConfiguration.AlertSound {
-    guard let soundName, !soundName.isEmpty else {
+    guard let soundName = alarmSchedulerEffectiveSoundName(soundName) else {
       return .default
     }
     return .named(soundName)
@@ -717,11 +733,28 @@ public class AlarmSchedulerModule: Module {
     let metadata = normalizeMetadata(alarm.ios?.metadata, id: id, title: title)
     let timestamp = alarm.timestamp.flatMap { $0 > Date().timeIntervalSince1970 * 1000 ? Int64($0) : nil }
       ?? nextTriggerTimestamp(hour: hour, minute: minute, weekdays: weekdays)
+    let runtimeSoundUri = normalizedSoundName(alarm.ios?.soundUri) ?? normalizedSoundName(alarm.soundUri)
+    let soundName: String?
+    if let runtimeSoundUri {
+      soundName = try prepareRuntimeSound(uri: runtimeSoundUri, alarmId: id)
+    } else {
+      removeRuntimeSound(alarmId: id)
+      soundName = normalizedSoundName(alarm.ios?.soundName)
+    }
     var alarmKitDebugState: [String: Any]?
 
     #if canImport(AlarmKit)
     if #available(iOS 26.0, *) {
-      alarmKitDebugState = try await scheduleAlarmKit(id: id, title: title, hour: hour, minute: minute, weekdays: weekdays, options: alarm.ios, metadata: metadata)
+      alarmKitDebugState = try await scheduleAlarmKit(
+        id: id,
+        title: title,
+        hour: hour,
+        minute: minute,
+        weekdays: weekdays,
+        options: alarm.ios,
+        metadata: metadata,
+        soundName: soundName
+      )
     } else {
       throw UnsupportedAlarmException("AlarmKit requires iOS 26 or newer.")
     }
@@ -739,7 +772,7 @@ public class AlarmSchedulerModule: Module {
       "platform": "ios",
       "metadata": metadata
     ]
-    if let soundName = normalizedSoundName(alarm.ios?.soundName) {
+    if let soundName {
       stored["iosSoundName"] = soundName
     }
     if let alarmKitDebugState {
@@ -776,6 +809,7 @@ public class AlarmSchedulerModule: Module {
     AlarmSchedulerNativeAlarmStore.resetCompletion(alarmId: id)
     AlarmSchedulerNativeAlarmStore.clearActions(alarmId: id)
     let didRemoveStoredAlarm = remove(id: id)
+    removeRuntimeSound(alarmId: id)
     return didCancelNativeAlarm || didRemoveStoredAlarm
   }
 
@@ -916,7 +950,8 @@ public class AlarmSchedulerModule: Module {
     minute: Int,
     weekdays: [Int],
     options: IosAlarmOptionsRecord?,
-    metadata: [String: Any]
+    metadata: [String: Any],
+    soundName: String?
   ) async throws -> [String: Any] {
     guard let alarmID = UUID(uuidString: id) else {
       throw InvalidAlarmException("Alarm id must be a UUID string on iOS.")
@@ -952,7 +987,7 @@ public class AlarmSchedulerModule: Module {
       tintColor: Color.accentColor
     )
     let schedule = try makeAlarmKitSchedule(hour: hour, minute: minute, weekdays: weekdays)
-    let soundName = normalizedSoundName(options?.soundName)
+    let effectiveSoundName = alarmSchedulerEffectiveSoundName(soundName)
     let stopIntent = makeStopIntent(
       id: id,
       title: title,
@@ -960,7 +995,7 @@ public class AlarmSchedulerModule: Module {
       minute: minute,
       weekdays: weekdays,
       behavior: normalizeStopIntentBehavior(options?.stopIntentBehavior),
-      soundName: soundName
+      soundName: effectiveSoundName
     )
     let secondaryIntent = makeSecondaryIntent(id: id, behavior: options?.secondaryButtonBehavior)
     _ = try await AlarmManager.shared.schedule(
@@ -970,13 +1005,15 @@ public class AlarmSchedulerModule: Module {
         attributes: attributes,
         stopIntent: stopIntent,
         secondaryIntent: secondaryIntent,
-        sound: makeAlarmSound(soundName)
+        sound: makeAlarmSound(effectiveSoundName)
       )
     )
     var debugState = alertPresentation.debugState
-    debugState["sound"] = soundName == nil ? "default" : "named"
-    if let soundName {
-      debugState["soundName"] = soundName
+    debugState["sound"] = effectiveSoundName == nil ? "default" : "named"
+    if let effectiveSoundName {
+      debugState["soundName"] = effectiveSoundName
+    } else if soundName != nil {
+      debugState["soundFallbackReason"] = "iosSimulatorCustomSoundUnsupported"
     }
     return debugState
   }
@@ -1202,10 +1239,98 @@ public class AlarmSchedulerModule: Module {
     return soundName
   }
 
+  /**
+   * AlarmKit resolves runtime sounds from Library/Sounds. Transcoding to a short PCM CAF makes
+   * picker results such as MP3, M4A, WAV and AIFF conform to the system alert-sound contract.
+   */
+  private func prepareRuntimeSound(uri: String, alarmId: String) throws -> String {
+    guard let alarmId = UUID(uuidString: alarmId)?.uuidString.lowercased() else {
+      throw InvalidAlarmException("Alarm id must be a UUID string on iOS.")
+    }
+    guard let sourceUrl = URL(string: uri), sourceUrl.isFileURL else {
+      throw InvalidAlarmException("ios.soundUri must be a readable local file URI.")
+    }
+
+    let isSecurityScoped = sourceUrl.startAccessingSecurityScopedResource()
+    defer {
+      if isSecurityScoped {
+        sourceUrl.stopAccessingSecurityScopedResource()
+      }
+    }
+
+    let fileManager = FileManager.default
+    guard let libraryUrl = fileManager.urls(for: .libraryDirectory, in: .userDomainMask).first else {
+      throw InvalidAlarmException("Unable to locate the app Library directory.")
+    }
+    let soundsUrl = libraryUrl.appendingPathComponent("Sounds", isDirectory: true)
+    do {
+      try fileManager.createDirectory(at: soundsUrl, withIntermediateDirectories: true)
+    } catch {
+      throw InvalidAlarmException("Unable to create Library/Sounds: \(error.localizedDescription)")
+    }
+
+    let fileName = "alarm-scheduler-\(alarmId).caf"
+    let destinationUrl = soundsUrl.appendingPathComponent(fileName)
+    let temporaryUrl = fileManager.temporaryDirectory
+      .appendingPathComponent("alarm-scheduler-\(alarmId)-\(UUID().uuidString).caf")
+    do {
+      let input = try AVAudioFile(forReading: sourceUrl)
+      let format = input.processingFormat
+      guard format.sampleRate > 0, format.channelCount > 0 else {
+        throw InvalidAlarmException("The selected file does not contain readable audio.")
+      }
+      let output = try AVAudioFile(forWriting: temporaryUrl, settings: format.settings)
+      var remainingFrames = min(input.length, AVAudioFramePosition(format.sampleRate * 29))
+      while remainingFrames > 0 {
+        let frameCount = AVAudioFrameCount(min(remainingFrames, 4096))
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount) else {
+          throw InvalidAlarmException("Unable to allocate an audio conversion buffer.")
+        }
+        try input.read(into: buffer, frameCount: frameCount)
+        guard buffer.frameLength > 0 else {
+          break
+        }
+        try output.write(from: buffer)
+        remainingFrames -= AVAudioFramePosition(buffer.frameLength)
+      }
+      guard input.length > 0 else {
+        throw InvalidAlarmException("The selected audio file is empty.")
+      }
+      if fileManager.fileExists(atPath: destinationUrl.path) {
+        _ = try fileManager.replaceItemAt(destinationUrl, withItemAt: temporaryUrl)
+      } else {
+        try fileManager.moveItem(at: temporaryUrl, to: destinationUrl)
+      }
+    } catch let error as InvalidAlarmException {
+      try? fileManager.removeItem(at: temporaryUrl)
+      throw error
+    } catch {
+      try? fileManager.removeItem(at: temporaryUrl)
+      throw InvalidAlarmException("Unable to import the selected alarm sound: \(error.localizedDescription)")
+    }
+    return fileName
+  }
+
+  private func removeRuntimeSound(alarmId: String) {
+    guard let alarmId = UUID(uuidString: alarmId)?.uuidString.lowercased(),
+      let libraryUrl = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first else {
+      return
+    }
+    let soundsUrl = libraryUrl.appendingPathComponent("Sounds", isDirectory: true)
+    let prefix = "alarm-scheduler-\(alarmId)."
+    let files = (try? FileManager.default.contentsOfDirectory(
+      at: soundsUrl,
+      includingPropertiesForKeys: nil
+    )) ?? []
+    for file in files where file.lastPathComponent.hasPrefix(prefix) {
+      try? FileManager.default.removeItem(at: file)
+    }
+  }
+
   #if canImport(AlarmKit)
   @available(iOS 26.0, *)
   private func makeAlarmSound(_ soundName: String?) -> AlertConfiguration.AlertSound {
-    guard let soundName = normalizedSoundName(soundName) else {
+    guard let soundName = alarmSchedulerEffectiveSoundName(normalizedSoundName(soundName)) else {
       return .default
     }
     return .named(soundName)

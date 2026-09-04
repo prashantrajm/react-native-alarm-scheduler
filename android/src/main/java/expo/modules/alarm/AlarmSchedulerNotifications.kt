@@ -37,8 +37,8 @@ internal object AlarmSchedulerNotifications {
    * service so the user is still woken, as loudly as the platform allows without a service.
    */
   fun postFallbackNotification(context: Context, alarmId: String, options: AlarmSchedulerOptions) {
-    createFallbackChannel(context, options)
-    val notification = build(context, alarmId, options, CHANNEL_FALLBACK, ongoing = false)
+    val channelId = createFallbackChannel(context, options)
+    val notification = build(context, alarmId, options, channelId, ongoing = false)
     val manager = context.getSystemService(NotificationManager::class.java) ?: return
     runCatching { manager.notify(FALLBACK_NOTIFICATION_ID, notification) }
   }
@@ -70,6 +70,10 @@ internal object AlarmSchedulerNotifications {
 
     if (options.fullScreen) {
       builder.setFullScreenIntent(contentIntent, true)
+    }
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O && !ongoing) {
+      @Suppress("DEPRECATION")
+      builder.setSound(fallbackSoundUri(context, options))
     }
 
     builder.addAction(
@@ -109,14 +113,15 @@ internal object AlarmSchedulerNotifications {
     )
   }
 
-  private fun createFallbackChannel(context: Context, options: AlarmSchedulerOptions) {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-      return
-    }
-    val manager = context.getSystemService(NotificationManager::class.java) ?: return
+  private fun createFallbackChannel(context: Context, options: AlarmSchedulerOptions): String {
     val sound = fallbackSoundUri(context, options)
+    val channelId = "${CHANNEL_FALLBACK}_${sound.toString().hashCode().toUInt().toString(16)}"
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+      return channelId
+    }
+    val manager = context.getSystemService(NotificationManager::class.java) ?: return channelId
     manager.createNotificationChannel(
-      NotificationChannel(CHANNEL_FALLBACK, "Alarms (fallback)", NotificationManager.IMPORTANCE_HIGH).apply {
+      NotificationChannel(channelId, "Alarms (fallback)", NotificationManager.IMPORTANCE_HIGH).apply {
         setSound(
           sound,
           AudioAttributes.Builder()
@@ -130,10 +135,13 @@ internal object AlarmSchedulerNotifications {
         setShowBadge(false)
       }
     )
+    return channelId
   }
 
   private fun fallbackSoundUri(context: Context, options: AlarmSchedulerOptions): Uri? {
-    options.soundUri?.let { raw -> runCatching { Uri.parse(raw) }.getOrNull()?.let { return it } }
+    options.soundUri?.let { raw ->
+      runCatching { Uri.parse(raw) }.getOrNull()?.takeUnless { it.scheme == "file" }?.let { return it }
+    }
     options.soundName?.let { name ->
       val resourceId = context.resources.getIdentifier(name.substringBeforeLast('.'), "raw", context.packageName)
       if (resourceId != 0) {

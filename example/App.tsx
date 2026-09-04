@@ -5,6 +5,7 @@ import AlarmScheduler, {
   type NativeAlarmDebugState,
   type ScheduledAlarm,
 } from 'react-native-alarm-scheduler';
+import * as DocumentPicker from 'expo-document-picker';
 import {
   Button,
   Platform,
@@ -29,6 +30,7 @@ export default function App() {
   const [alarmId, setAlarmId] = useState(TEST_ALARM_ID);
   const [snapshot, setSnapshot] = useState<Snapshot>({});
   const [events, setEvents] = useState<string[]>([]);
+  const [sound, setSound] = useState<{ name: string; uri: string }>();
 
   const appendLog = useCallback((label: string, value?: unknown) => {
     const text =
@@ -123,6 +125,7 @@ export default function App() {
       hour: nextMinute.getHours(),
       minute: nextMinute.getMinutes(),
       title: 'AlarmKit package test',
+      soundUri: sound?.uri,
       ios: {
         alertTitle: 'AlarmKit package test',
         metadata: {
@@ -148,7 +151,19 @@ export default function App() {
     setAlarmId(scheduled.id);
     appendLog('scheduled primary', scheduled);
     await inspect(scheduled.id);
-  }, [appendLog, inspect]);
+  }, [appendLog, inspect, sound]);
+
+  const pickAlarmSound = useCallback(async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: 'audio/*',
+      copyToCacheDirectory: true,
+    });
+    if (!result.canceled) {
+      const picked = result.assets[0];
+      setSound({ name: picked.name, uri: picked.uri });
+      appendLog('picked alarm sound', { name: picked.name, uri: picked.uri });
+    }
+  }, [appendLog]);
 
   const armBackupFromCurrentState = useCallback(async () => {
     const state = await inspect(currentAlarmId);
@@ -183,7 +198,7 @@ export default function App() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.container}>
-        <Text style={styles.header}>Expo Alarm</Text>
+        <Text style={styles.header}>Alarm Scheduler</Text>
         <Text style={styles.subheader}>AlarmKit package harness</Text>
         <Group name="Permissions">
           <Button
@@ -195,6 +210,11 @@ export default function App() {
             }}
           />
           <Button title="Inspect native state" onPress={() => inspect()} />
+        </Group>
+        <Group name="Alarm sound">
+          <Text style={styles.mono}>{sound?.name ?? 'System default'}</Text>
+          <Button title="Choose audio file" onPress={pickAlarmSound} />
+          {sound ? <Button title="Use system default" onPress={() => setSound(undefined)} /> : null}
         </Group>
         <Group name="AlarmKit loop">
           <Text style={styles.mono}>alarmId: {currentAlarmId}</Text>

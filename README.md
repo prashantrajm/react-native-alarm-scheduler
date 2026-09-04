@@ -23,7 +23,7 @@ schedules an actual alarm.
 - 📱 **Full-screen lock-screen ringing UI** backed by a foreground service, so a killed app still rings.
 - 🔁 **Survives reboots**, app updates, and clock/timezone changes.
 - 🧭 **Cold-launch handoff records** written natively before any JS runs, so your app always knows why it opened.
-- 🎵 **Custom alarm sounds** on both platforms, bundled by the config plugin.
+- 🎵 **User-selected alarm sounds** — pass a picker URI at runtime; each alarm can use a different local audio file.
 - 🕐 **System Clock integration** on Android via `ACTION_SET_ALARM` and `ACTION_SHOW_ALARMS`.
 - 🧩 **Expo config plugin** for permissions and `NSAlarmKitUsageDescription`.
 - 🔷 **Fully typed** TypeScript API, with explicit unavailable behavior where the OS cannot schedule alarms.
@@ -147,7 +147,7 @@ The guarantee is absolute on Android and best-effort on iOS — see
 | --- | :---: | :---: |
 | Schedule, list and cancel app-owned alarms | ✅ | ✅ |
 | Permissions and settings surfaces | ✅ | ✅ |
-| Custom alarm sound | ✅ | ✅ |
+| Custom alarm sound | ✅ | ✅ physical device; system default in Simulator |
 | Ring until the app says stop (`openAppOnly`) | ✅ | ⚠️ |
 | Cold-launch handoff, action records, backup alarms | ✅ | ✅ |
 | Survive reboot | ✅ | ✅ |

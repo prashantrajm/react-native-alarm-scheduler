@@ -1,13 +1,83 @@
 ---
 title: Custom alarm sounds
-description: Bundling and selecting a custom alarm sound on each platform.
+description: Let users choose a different local audio file for each alarm.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
 
-## iOS
+## User-selected audio
 
-Add the file to the config plugin so prebuild copies it into the app bundle's Resources build phase:
+Use any document or media picker that returns a readable local URI. With Expo, install the
+[SDK-matched document picker](https://docs.expo.dev/versions/v54.0.0/sdk/document-picker/):
+
+```sh
+npx expo install expo-document-picker
+```
+
+Then pass the selected URI directly to the alarm:
+
+```ts
+import * as DocumentPicker from 'expo-document-picker';
+import AlarmScheduler from 'react-native-alarm-scheduler';
+
+const result = await DocumentPicker.getDocumentAsync({
+  type: 'audio/*',
+  copyToCacheDirectory: true,
+});
+
+if (!result.canceled) {
+  await AlarmScheduler.scheduleAlarmAsync({
+    hour: 7,
+    minute: 0,
+    soundUri: result.assets[0].uri,
+  });
+}
+```
+
+`soundUri` is common to both platforms. You may instead set `ios.soundUri` or `android.soundUri`
+when the platforms should use different files. Each alarm can use a different URI.
+
+The scheduler imports the audio while `scheduleAlarmAsync` runs, so the alarm does not depend on a
+temporary picker permission or cache file later:
+
+- **iOS:** converts the first 29 seconds to a PCM CAF file in the app's `Library/Sounds` directory,
+  which AlarmKit can resolve while the app is not running.
+- **Android:** copies the original into the app's private files directory and loops it through the
+  native alarm audio stream.
+
+The imported copy is replaced when the same alarm id is rescheduled and removed when the alarm is
+cancelled. The source file may be moved or deleted after scheduling.
+
+<Callout type="warn" title="Readable files only">
+DRM-protected Apple Music, Spotify and similar subscription tracks are not readable local audio
+files and cannot be imported. Exported or downloaded audio files from Files, Downloads, cloud-drive
+providers and media-creation apps work when the picker grants access.
+</Callout>
+
+<Callout title="Why iOS uses the first 29 seconds">
+AlarmKit uses the system alert-sound facility. Apple requires alert sounds to be under 30 seconds
+and stored in the app bundle or `Library/Sounds`. The module performs the conversion and trim so a
+normal user-selected MP3, M4A, WAV, AIFF or CAF file can be used without a build-time config change.
+See Apple's [AlarmKit custom-sound guidance](https://developer.apple.com/videos/play/wwdc2025/230/?time=626).
+</Callout>
+
+<Callout type="warn" title="iOS Simulator uses the system default">
+iOS 26.x Simulator can crash SpringBoard inside Apple's private ToneLibrary when AlarmKit starts an
+external sound. To keep development builds stable, the package uses the system default sound in the
+Simulator and reports `soundFallbackReason: 'iosSimulatorCustomSoundUnsupported'` in native debug
+state. Test custom sound playback on a physical iOS 26+ device. Android emulators are unaffected.
+</Callout>
+
+<Callout title="Android fallback behavior">
+The foreground ring service plays the selected file. If Android refuses to start that service and
+the package must fall back to a system notification channel, it uses the system alarm tone because
+the notification service cannot read the app's private imported file.
+</Callout>
+
+## Build-time bundled sounds
+
+Bundled sounds remain useful when the developer owns the fixed sound catalog. On iOS, add compatible
+sound files to the config plugin:
 
 ```json title="app.json"
 {
@@ -15,54 +85,34 @@ Add the file to the config plugin so prebuild copies it into the app bundle's Re
     "plugins": [
       [
         "react-native-alarm-scheduler",
-        { "iosAlarmSounds": ["./assets/audio/bollywood-alarm.mp3"] }
+        { "iosAlarmSounds": ["./assets/audio/morning-alarm.caf"] }
       ]
     ]
   }
 }
 ```
 
-Then reference it by its exact bundled filename, **including the extension**:
+Reference the exact filename:
 
 ```ts
 await AlarmScheduler.scheduleAlarmAsync({
   hour: 7,
   minute: 0,
-  ios: { soundName: 'bollywood-alarm.mp3' },
+  ios: { soundName: 'morning-alarm.caf' },
 });
 ```
 
-`ios.soundName` maps to AlarmKit's `AlertConfiguration.AlertSound.named(soundName)`. Omit it to use
-the system default sound.
-
-## Android
-
-Put the file in `android/app/src/main/res/raw` and reference it by name — the extension is optional:
+On Android, place the file in `android/app/src/main/res/raw` and use its resource name:
 
 ```ts
 await AlarmScheduler.scheduleAlarmAsync({
   hour: 7,
   minute: 0,
-  android: { soundName: 'bollywood_alarm' },
+  android: { soundName: 'morning_alarm' },
 });
 ```
 
-Or pass any content or resource URI, which takes precedence over `soundName`:
-
-```ts
-await AlarmScheduler.scheduleAlarmAsync({
-  hour: 7,
-  minute: 0,
-  android: { soundUri: 'content://media/internal/audio/media/42' },
-});
-```
-
-If neither resolves, the package falls back to the system alarm ringtone.
-
-<Callout title="res/raw filenames">
-Android resource names must be lowercase, and may only contain letters, digits and underscores.
-`bollywood-alarm.mp3` is not a valid raw resource name — use `bollywood_alarm.mp3`.
-</Callout>
+Runtime `soundUri` takes precedence over bundled `soundName`.
 
 ## Staying audible on Android
 
@@ -74,16 +124,16 @@ await AlarmScheduler.scheduleAlarmAsync({
   hour: 7,
   minute: 0,
   android: {
-    enforceVolume: true, // default — pin the alarm stream for the ring
-    restoreVolume: true, // default — put it back afterwards
-    volume: 1, // fraction of max alarm volume, 0–1
-    vibrate: true, // default
+    enforceVolume: true,
+    restoreVolume: true,
+    volume: 1,
+    vibrate: true,
   },
 });
 ```
 
-With `enforceVolume` on (the default), the alarm stream is pinned at `volume` for the duration of the
-ring and re-raised whenever anything lowers it, then the user's original level is restored unless
+With `enforceVolume` on, the alarm stream is pinned at `volume` for the duration of the ring and
+re-raised whenever anything lowers it. The user's original level is restored afterwards unless
 `restoreVolume` is `false`.
 
 iOS alarm volume is owned by AlarmKit and is not configurable from the package.

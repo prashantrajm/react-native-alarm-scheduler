@@ -57,6 +57,9 @@ export type IosAlarmOptions = {
   countdownTitle?: string;
   stopIntentBehavior?: "recordOnly" | "openApp" | "rescheduleImmediate";
   secondaryButtonBehavior?: "openApp" | "recordOnly" | "none";
+  /** Runtime audio file URI. Overrides `soundName` and is copied into `Library/Sounds`. */
+  soundUri?: string;
+  /** Name of a sound already bundled in the app or present in `Library/Sounds`. */
   soundName?: string;
 };
 
@@ -86,7 +89,7 @@ export type AndroidAlarmOptions = {
   secondaryButtonBehavior?: "openApp" | "recordOnly" | "none";
   /** Name of a file in `android/app/src/main/res/raw` (extension optional). */
   soundName?: string;
-  /** Any content/resource URI. Takes precedence over `soundName`. */
+  /** Runtime audio file URI. Takes precedence over `soundName` and is copied for durable access. */
   soundUri?: string;
   /** Defaults to `true`. */
   vibrate?: boolean;
@@ -150,6 +153,11 @@ export type AlarmScheduleInput = {
   weekdays?: AlarmWeekday[];
   timestamp?: number;
   showUi?: boolean;
+  /**
+   * Runtime-selected local audio file URI. The native module copies it into durable app storage
+   * while scheduling so the alarm can play after the picker grant or cache file expires.
+   */
+  soundUri?: string;
   ios?: IosAlarmOptions;
   android?: AndroidAlarmOptions;
 };
@@ -206,6 +214,10 @@ export type NativeAlarmDebugState = {
   runtimeSupportsSecondaryOnlyAlert?: boolean;
   sound?: "default" | "named";
   soundName?: string;
+  /** Explains why a requested custom sound was replaced with the system default. */
+  soundFallbackReason?: "iosSimulatorCustomSoundUnsupported";
+  /** Android durable URI used by the native ring service for a runtime-selected sound. */
+  soundUri?: string;
   /** Android: the ring service is currently playing this alarm. */
   isRinging?: boolean;
   /** Android: the alarm is still present in the native store. */

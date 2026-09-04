@@ -32,6 +32,8 @@ type NativeAlarmDebugState = {
   runtimeSupportsSecondaryOnlyAlert?: boolean;
   sound?: 'default' | 'named';
   soundName?: string;
+  soundFallbackReason?: 'iosSimulatorCustomSoundUnsupported';
+  soundUri?: string;
   isRinging?: boolean;
   isScheduled?: boolean;
   canUseFullScreenIntent?: boolean;

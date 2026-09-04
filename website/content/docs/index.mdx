@@ -37,7 +37,7 @@ await AlarmScheduler.scheduleAlarmAsync({
 - **Survives reboots**, app updates, and clock or timezone changes.
 - **Cold-launch handoff records** written natively before any JS runs, so your app always knows why
   it opened.
-- **Custom alarm sounds** on both platforms, bundled by the config plugin.
+- **User-selected alarm sounds** from runtime picker URIs, with a different local file per alarm.
 - **System Clock integration** on Android via `ACTION_SET_ALARM` and `ACTION_SHOW_ALARMS`.
 - **Expo config plugin** for permissions and `NSAlarmKitUsageDescription`.
 - **Fully typed**, with explicit unavailable behavior where the OS cannot schedule alarms.

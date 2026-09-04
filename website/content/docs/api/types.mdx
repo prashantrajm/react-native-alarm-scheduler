@@ -49,6 +49,7 @@ type AlarmScheduleInput = {
   weekdays?: AlarmWeekday[];
   timestamp?: number;
   showUi?: boolean;
+  soundUri?: string;
   ios?: IosAlarmOptions;
   android?: AndroidAlarmOptions;
 };
@@ -83,6 +84,7 @@ type IosAlarmOptions = {
   countdownTitle?: string;
   stopIntentBehavior?: 'recordOnly' | 'openApp' | 'rescheduleImmediate';
   secondaryButtonBehavior?: 'openApp' | 'recordOnly' | 'none';
+  soundUri?: string;
   soundName?: string;
 };
 
@@ -178,6 +180,8 @@ type NativeAlarmDebugState = {
   runtimeSupportsSecondaryOnlyAlert?: boolean;
   sound?: 'default' | 'named';
   soundName?: string;
+  soundFallbackReason?: 'iosSimulatorCustomSoundUnsupported';
+  soundUri?: string;
   isRinging?: boolean;
   isScheduled?: boolean;
   canUseFullScreenIntent?: boolean;

@@ -29,7 +29,7 @@ Add the plugin to your app config before running `expo prebuild`:
           "alarmKitUsageDescription": "Allow this app to schedule alarms.",
           "addExactAlarmPermission": true,
           "addNotificationPermission": true,
-          "iosAlarmSounds": ["./assets/audio/bollywood-alarm.mp3"]
+          "iosAlarmSounds": ["./assets/audio/morning-alarm.caf"]
         }
       ]
     ]
@@ -53,7 +53,7 @@ npx expo run:ios
 | `addExactAlarmPermission` | `boolean` | `true` | Adds `android.permission.SCHEDULE_EXACT_ALARM`. |
 | `addNotificationPermission` | `boolean` | `true` | Adds `android.permission.POST_NOTIFICATIONS`. |
 | `addUseExactAlarmPermission` | `boolean` | `false` | Adds `android.permission.USE_EXACT_ALARM`, which is granted without prompting. Google Play only allows it for apps whose core function is an alarm clock or calendar. |
-| `iosAlarmSounds` | `string[]` | `[]` | Adds custom sound files to the iOS app bundle Resources build phase so AlarmKit can resolve them by filename. |
+| `iosAlarmSounds` | `string[]` | `[]` | Adds a developer-owned sound catalog to the iOS app bundle. Runtime user-selected sounds use `soundUri` and need no config entry. |
 
 The plugin also enables `NSSupportsLiveActivities` for iOS AlarmKit intents and adds
 `com.android.alarm.permission.SET_ALARM` for Android system Clock alarm intents.

@@ -22,6 +22,7 @@ class AlarmScheduleRecord : Record {
   @Field var weekdays: List<Int>? = null
   @Field var timestamp: Double? = null
   @Field var showUi: Boolean = false
+  @Field var soundUri: String? = null
   @Field var ios: IosAlarmOptionsRecord? = null
   @Field var android: AndroidAlarmOptionsRecord? = null
 }
@@ -35,6 +36,7 @@ class IosAlarmOptionsRecord : Record {
   @Field var countdownTitle: String? = null
   @Field var stopIntentBehavior: String? = null
   @Field var secondaryButtonBehavior: String? = null
+  @Field var soundUri: String? = null
   @Field var soundName: String? = null
 }
 
@@ -155,6 +157,7 @@ class AlarmSchedulerModule : Module() {
       val stored = AlarmSchedulerStore.alarm(context, alarmId)
       if (stored != null && AlarmSchedulerJson.intList(stored.optJSONArray("weekdays")).isEmpty()) {
         AlarmSchedulerStore.removeAlarm(context, alarmId)
+        AlarmSchedulerSoundStore.delete(context, alarmId)
       }
     }
 
@@ -333,6 +336,7 @@ class AlarmSchedulerModule : Module() {
       "runtimeSupportsSecondaryOnlyAlert" to true,
       "sound" to if (options.soundName == null && options.soundUri == null) "default" else "named",
       "soundName" to options.soundName,
+      "soundUri" to options.soundUri,
       "isRinging" to (AlarmSchedulerRingService.activeAlarmId() == alarmId),
       "isScheduled" to (stored != null),
       "canUseFullScreenIntent" to canUseFullScreenIntent(),

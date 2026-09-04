@@ -23,7 +23,7 @@ Full docs: <https://react-native-alarm-scheduler.vercel.app/llms.txt>
 { "expo": { "plugins": [["react-native-alarm-scheduler", { "alarmKitUsageDescription": "…" }]] } }
 ```
 
-## The five rules that cause most bugs
+## The six rules that cause most bugs
 
 **1. Gate every schedule on `canScheduleExactAlarms`.** On Android this is not a nicety: without the
 exact-alarm grant the ringing foreground service cannot legally start, so the alarm degrades to a
@@ -55,14 +55,21 @@ can share ids.
 
 **4. Android inherits the `ios` options.** `metadata`, `alertTitle`, `alertActionMode`,
 `stopButtonTitle`, `secondaryButtonTitle`, `stopIntentBehavior`, `secondaryButtonBehavior` and
-`soundName` fall back to the `ios` value when omitted. Do not duplicate them into `android` — set
-`android` fields only where the platforms should genuinely differ (`launchUri`, `soundUri`,
+`soundUri` and `soundName` fall back to the `ios` value when omitted. Do not duplicate them into `android` — set
+`android` fields only where the platforms should genuinely differ (`launchUri`,
 `maxRingDurationSeconds`, volume behavior).
 
 **5. `completeNativeAlarmAsync(alarmId)` is mandatory, not advisory.** With
 `alertActionMode: 'openAppOnly'` the Android alarm keeps playing until this call lands. Call it
 only after the user actually satisfies the completion condition, then `cancelAlarmAsync` and
 reschedule if the alarm repeats.
+
+**6. Runtime sounds must be readable local files.** Pass a picker result as the top-level
+`soundUri`; the module copies it into durable native storage during `scheduleAlarmAsync`. On iOS it
+transcodes the first 29 seconds to a PCM CAF for AlarmKit. DRM-protected Apple Music or Spotify
+tracks cannot be imported because the app never receives their audio bytes. iOS Simulator uses the
+system default sound because its ToneLibrary can crash SpringBoard for external AlarmKit sounds;
+verify custom iOS playback on a physical device.
 
 ## Completion-gated alarms
 

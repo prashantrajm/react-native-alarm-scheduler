@@ -16,12 +16,12 @@ const scheduled = await AlarmScheduler.scheduleAlarmAsync({
   minute: 30,
   title: 'Morning alarm',
   weekdays: [1, 2, 3, 4, 5],
+  soundUri: pickedAudioUri,
   ios: {
     alertTitle: 'Morning alarm',
     secondaryButtonTitle: 'Open',
     stopIntentBehavior: 'rescheduleImmediate',
     secondaryButtonBehavior: 'openApp',
-    soundName: 'bollywood-alarm.mp3',
     metadata: { route: 'alarm-detail' },
   },
   android: {
@@ -42,6 +42,7 @@ type AlarmScheduleInput = {
   weekdays?: AlarmWeekday[];
   timestamp?: number;
   showUi?: boolean;
+  soundUri?: string;
   ios?: IosAlarmOptions;
   android?: AndroidAlarmOptions;
 };
@@ -54,6 +55,7 @@ type AlarmScheduleInput = {
 | `minute` | `0`–`59`. |
 | `weekdays` | ISO numbering: `1` Monday … `7` Sunday. Omit for a one-shot alarm. |
 | `timestamp` | Milliseconds since the Unix epoch. When omitted, the module schedules the next matching `hour`/`minute`. |
+| `soundUri` | Runtime-selected local audio URI. Imported into durable native storage while scheduling. |
 
 ### Returns
 
@@ -88,13 +90,15 @@ type IosAlarmOptions = {
   countdownTitle?: string;
   stopIntentBehavior?: 'recordOnly' | 'openApp' | 'rescheduleImmediate';
   secondaryButtonBehavior?: 'openApp' | 'recordOnly' | 'none';
+  soundUri?: string;
   soundName?: string;
 };
 ```
 
 `metadata` is stored by the package and included in AlarmKit metadata; the package always adds
-`alarmId` and `title`. `soundName` maps to `AlertConfiguration.AlertSound.named(soundName)` and must
-be the exact bundled filename including the extension.
+`alarmId` and `title`. `soundUri` is transcoded into `Library/Sounds` and takes precedence over
+`soundName`. `soundName` maps directly to `AlertConfiguration.AlertSound.named(soundName)` and must
+already exist in the app bundle or `Library/Sounds`.
 
 See [iOS platform behavior](/platforms/ios#alert-presentation) for what each `stopIntentBehavior` and
 `secondaryButtonBehavior` value actually does.
@@ -129,7 +133,7 @@ type AndroidAlarmOptions = {
 | --- | --- | --- |
 | `alertBody` | `"Alarm"` | Secondary line on the ringing screen and notification. |
 | `soundName` | — | File in `android/app/src/main/res/raw`, extension optional. |
-| `soundUri` | — | Any content or resource URI. Takes precedence over `soundName`. |
+| `soundUri` | — | Runtime local URI. Copied into durable private storage and takes precedence over `soundName`. |
 | `vibrate` | `true` | |
 | `enforceVolume` | `true` | Pins the alarm stream at `volume` and re-raises it when anything lowers it. |
 | `restoreVolume` | `true` | Restore the user's previous alarm volume when the ring ends. |
@@ -142,7 +146,7 @@ type AndroidAlarmOptions = {
 
 <Callout title="Android inherits the iOS options">
 `metadata`, `alertTitle`, `alertActionMode`, `stopButtonTitle`, `secondaryButtonTitle`,
-`stopIntentBehavior`, `secondaryButtonBehavior` and `soundName` fall back to the matching `ios` value
+`stopIntentBehavior`, `secondaryButtonBehavior`, `soundUri` and `soundName` fall back to the matching `ios` value
 when omitted. An app written against the AlarmKit flow behaves the same on Android without passing an
 `android` block at all.
 </Callout>

@@ -81,6 +81,7 @@ internal data class AlarmSchedulerOptions(
     fun resolve(
       title: String,
       alarmId: String,
+      soundUri: String?,
       android: AndroidAlarmOptionsRecord?,
       ios: IosAlarmOptionsRecord?
     ): AlarmSchedulerOptions {
@@ -104,7 +105,7 @@ internal data class AlarmSchedulerOptions(
           android?.secondaryButtonBehavior ?: ios?.secondaryButtonBehavior
         ),
         soundName = firstNonBlank(android?.soundName, ios?.soundName),
-        soundUri = firstNonBlank(android?.soundUri),
+        soundUri = firstNonBlank(android?.soundUri, soundUri, ios?.soundUri),
         vibrate = android?.vibrate ?: true,
         enforceVolume = android?.enforceVolume ?: true,
         restoreVolume = android?.restoreVolume ?: true,
@@ -119,7 +120,7 @@ internal data class AlarmSchedulerOptions(
 
     fun fromJson(json: JSONObject?, title: String, alarmId: String): AlarmSchedulerOptions {
       if (json == null) {
-        return resolve(title, alarmId, null, null)
+        return resolve(title, alarmId, null, null, null)
       }
       val metadata = json.optJSONObject("metadata") ?: JSONObject()
       metadata.put("alarmId", alarmId)
