@@ -27,6 +27,14 @@ struct IosAlarmOptionsRecord: Record {
   @Field var silent: Bool = false
 }
 
+struct RingHoldOptionsRecord: Record {
+  @Field var seconds: Double?
+  /// Android only. On iOS the app quiets its own audio.
+  @Field var volume: Double?
+  /// Android only.
+  @Field var vibrate: Bool?
+}
+
 final class InvalidAlarmException: Exception {
   // Not `message`: ExpoModulesCore 58 adds `open var message` to Exception, and SDK 57 has none to
   // override, so only a different name compiles against both.

@@ -11,6 +11,8 @@ import type {
   AlarmSchedulerModuleEvents,
   NativeAlarmBackupResult,
   NativeAlarmDebugState,
+  RingHoldOptions,
+  RingHoldResult,
   ScheduledAlarm,
 } from "./AlarmScheduler.types";
 
@@ -39,6 +41,16 @@ declare class AlarmSchedulerModule extends NativeModule<AlarmSchedulerModuleEven
     delaySeconds?: number,
   ): Promise<NativeAlarmBackupResult>;
   cancelNativeAlarmBackupAsync(alarmId: string): Promise<boolean>;
+  /**
+   * Quiets the ringing alarm for `seconds`, then lets it resume natively at full volume. Call it
+   * again to renew. Never completes, resolves or records an action for the alarm.
+   */
+  holdRingAsync(
+    alarmId: string,
+    options?: RingHoldOptions,
+  ): Promise<RingHoldResult>;
+  /** Ends a hold early: the full ring resumes immediately. */
+  releaseRingHoldAsync(alarmId: string): Promise<void>;
   clearBypassAsync(alarmId: string): Promise<void>;
   resetNativeAlarmCompletionAsync(alarmId: string): Promise<void>;
   getNativeAlarmDebugStateAsync(

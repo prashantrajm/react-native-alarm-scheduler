@@ -35,12 +35,14 @@ internal object AlarmSchedulerEventBus {
     alarmId: String,
     state: String,
     metadata: JSONObject?,
-    occurrence: JSONObject? = null
+    occurrence: JSONObject? = null,
+    heldUntil: Long? = null
   ) {
     val event = JSONObject()
       .put("id", alarmId)
       .put("state", state)
       .put("timestamp", System.currentTimeMillis())
+    heldUntil?.let { event.put("heldUntil", it) }
     if (metadata != null) {
       event.put("metadata", metadata)
     }

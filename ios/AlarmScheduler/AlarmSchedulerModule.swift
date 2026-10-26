@@ -79,6 +79,7 @@ public class AlarmSchedulerModule: Module {
 
     AsyncFunction("completeNativeAlarmAsync") { (alarmId: String) async -> Void in
       AlarmSchedulerNativeAlarmStore.complete(alarmId: alarmId)
+      AlarmSchedulerNativeAlarmStore.clearHeldUntil(alarmId: alarmId)
       await self.cancelNativeAndRetryAlarms(originalAlarmId: alarmId)
       AlarmSchedulerNativeAlarmStore.clearActions(alarmId: alarmId)
       self.finishOccurrenceRecords(alarmId: alarmId)
@@ -102,6 +103,14 @@ public class AlarmSchedulerModule: Module {
 
     AsyncFunction("cancelNativeAlarmBackupAsync") { (alarmId: String) async -> Bool in
       return await self.cancelNativeAlarmBackup(alarmId: alarmId)
+    }
+
+    AsyncFunction("holdRingAsync") { (alarmId: String, options: RingHoldOptionsRecord?) async -> [String: Any] in
+      return await self.holdRing(alarmId: alarmId, seconds: options?.seconds)
+    }
+
+    AsyncFunction("releaseRingHoldAsync") { (alarmId: String) async -> Void in
+      await self.releaseRingHold(alarmId: alarmId)
     }
 
     AsyncFunction("clearBypassAsync") { (alarmId: String) -> Void in
@@ -215,6 +224,20 @@ public class AlarmSchedulerModule: Module {
   @MainActor
   private func sendAlarmStateChange(_ alarm: Alarm) {
     let nativeAlarmId = alarm.id.uuidString
+    // A held ring's backup timer speaks for the held alarm: its countdown is the hold that
+    // holdRingAsync already reported, and its alert is the full ring coming back.
+    if let heldAlarmId = heldAlarmId(forBackupId: nativeAlarmId) {
+      switch mapAlarmState(alarm.state) {
+      case "countdown":
+        return
+      case "alerting":
+        AlarmSchedulerNativeAlarmStore.clearHeldUntil(alarmId: heldAlarmId)
+        sendRingHoldStateChange(alarmId: heldAlarmId, state: "alerting")
+        return
+      default:
+        break
+      }
+    }
     var occurrence = AlarmSchedulerOccurrenceStore.occurrence(id: nativeAlarmId)
     let alarmId = occurrence?["alarmId"] as? String ?? nativeAlarmId
     let state = mapAlarmState(alarm.state)

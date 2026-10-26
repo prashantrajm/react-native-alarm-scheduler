@@ -6,6 +6,7 @@ enum AlarmSchedulerNativeAlarmStore {
   private static let retryIdsKey = "alarm_scheduler_retry_ids_by_alarm"
   private static let pendingHandoffKey = "alarm_scheduler_pending_handoff"
   private static let intentDebugCountsKey = "alarm_scheduler_intent_debug_counts"
+  private static let ringHoldsKey = "alarm_scheduler_ring_holds"
   static let actionRecordedNotification = Notification.Name("expo.modules.alarm.actionRecorded")
 
   static func all() -> [[String: Any]] {
@@ -144,6 +145,30 @@ enum AlarmSchedulerNativeAlarmStore {
     counts[action] = (counts[action] ?? 0) + 1
     countsByAlarmId[alarmId] = counts
     UserDefaults.standard.set(countsByAlarmId, forKey: intentDebugCountsKey)
+  }
+
+  /// Epoch ms when each held alarm's backup timer brings the ring back.
+  static func ringHolds() -> [String: Int64] {
+    let stored = UserDefaults.standard.dictionary(forKey: ringHoldsKey) ?? [:]
+    return stored.compactMapValues { ($0 as? NSNumber)?.int64Value }
+  }
+
+  static func heldUntil(alarmId: String) -> Int64? {
+    ringHolds()[alarmId]
+  }
+
+  static func setHeldUntil(_ heldUntil: Int64, alarmId: String) {
+    var holds = ringHolds()
+    holds[alarmId] = heldUntil
+    UserDefaults.standard.set(holds, forKey: ringHoldsKey)
+  }
+
+  static func clearHeldUntil(alarmId: String) {
+    var holds = ringHolds()
+    guard holds.removeValue(forKey: alarmId) != nil else {
+      return
+    }
+    UserDefaults.standard.set(holds, forKey: ringHoldsKey)
   }
 
   private static func intentDebugCountsByAlarmId() -> [String: [String: Int]] {

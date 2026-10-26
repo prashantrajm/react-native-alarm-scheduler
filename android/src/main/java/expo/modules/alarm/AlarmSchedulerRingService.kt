@@ -21,6 +21,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
+import android.os.SystemClock
 import android.os.VibrationAttributes
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -33,6 +34,9 @@ import kotlin.math.roundToLong
  * Owns a ringing alarm for as long as it takes the user to finish whatever the app demands of
  * them. Nothing but [ACTION_COMPLETE] (driven by `completeNativeAlarmAsync`), an explicit stop, or
  * the configured timeout can silence it — swiping notifications and pressing volume keys cannot.
+ *
+ * [ACTION_HOLD] (driven by `holdRingAsync`) only quiets it for a while: the hold's own timer, owned
+ * here rather than by JS, brings the full ring back unless the app keeps renewing it.
  */
 class AlarmSchedulerRingService : Service() {
   private var mediaPlayer: MediaPlayer? = null
@@ -42,9 +46,13 @@ class AlarmSchedulerRingService : Service() {
   private var previousAlarmVolume: Int? = null
   private var targetAlarmVolume: Int? = null
   private var timeoutRunnable: Runnable? = null
+  private var timeoutDeadline = 0L
+  private var pausedTimeoutMillis: Long? = null
+  private var holdRunnable: Runnable? = null
   private val handler = Handler(Looper.getMainLooper())
 
   private var alarmId: String? = null
+  private var occurrenceId: String? = null
   private var options: AlarmSchedulerOptions? = null
 
   override fun onBind(intent: Intent?): IBinder? = null
@@ -55,6 +63,8 @@ class AlarmSchedulerRingService : Service() {
       ACTION_COMPLETE -> handleComplete(intent.getStringExtra(EXTRA_ALARM_ID))
       ACTION_STOP -> handleUserStop(intent.getStringExtra(EXTRA_ALARM_ID))
       ACTION_OPEN -> handleOpen(intent.getStringExtra(EXTRA_ALARM_ID))
+      ACTION_HOLD -> handleHold(intent.getStringExtra(EXTRA_ALARM_ID))
+      ACTION_RELEASE -> handleRelease(intent.getStringExtra(EXTRA_ALARM_ID))
       // A null intent means the system restarted a sticky service after killing the process
       // mid-ring. Pick the alarm back up rather than leaving the user un-woken.
       null -> resumeOrStop()
@@ -86,36 +96,54 @@ class AlarmSchedulerRingService : Service() {
     )
 
     // A second broadcast for an alarm that is already ringing (a backup catching up, say) must
-    // not restart playback or stack notifications.
+    // not restart playback or stack notifications, and must leave any hold exactly as it is.
     if (alarmId == id && (resolved.silent || mediaPlayer != null)) {
       startForegroundNotification(id, resolved)
       return
     }
 
+    cancelHoldTimer()
+    pausedTimeoutMillis = null
     alarmId = id
+    this.occurrenceId = occurrenceId
     options = resolved
     activeAlarmId = id
     AlarmSchedulerStore.setActiveRingAlarmId(this, id)
+
+    // A service restarted mid-hold (see resumeOrStop) comes back quiet for whatever time the hold
+    // had left, rather than ringing loud early.
+    val now = System.currentTimeMillis()
+    val hold = AlarmSchedulerStore.ringHold(this)
+    val holdMillis = AlarmSchedulerRingHoldPolicy.remainingMillis(
+      hold,
+      id,
+      AlarmSchedulerStore.isComplete(this, id),
+      now
+    )
+    if (holdMillis == null) {
+      AlarmSchedulerStore.clearRingHold(this, id)
+    }
 
     startForegroundNotification(id, resolved)
     acquireWakeLock(resolved)
     if (!resolved.silent) {
       enforceAlarmVolume(resolved)
-      startPlayback(resolved)
+      startPlayback(resolved, if (holdMillis != null && hold != null) hold.volume else 1f)
     }
-    startVibration(resolved)
+    if (holdMillis == null || hold?.vibrate == true) {
+      startVibration(resolved)
+    }
     scheduleTimeout(id, resolved)
     presentFullScreen(id, resolved, intent.getBooleanExtra(EXTRA_IS_BACKUP, false))
 
+    if (holdMillis != null && hold != null) {
+      applyHold(id, hold, holdMillis)
+      return
+    }
+
     // The handoff record and onAlarmTriggered are emitted by the receiver before this service is
     // even asked to start, so they survive the service being refused.
-    val occurrence = occurrenceId?.let { AlarmSchedulerOccurrenceStore.occurrence(this, it) }
-    AlarmSchedulerEventBus.emitStateChange(
-      id,
-      "alerting",
-      occurrence?.optJSONObject("metadata") ?: stored.optJSONObject("metadata"),
-      occurrence
-    )
+    emitState(id, "alerting")
   }
 
   private fun resumeOrStop() {
@@ -186,8 +214,119 @@ class AlarmSchedulerRingService : Service() {
     openApp(currentId, resolved)
   }
 
+  // region hold
+
+  /**
+   * Quiets the ring for the hold the module just stored. Renewing replaces the pending resume, so
+   * the app keeps the ring quiet only for as long as it keeps calling.
+   */
+  private fun handleHold(id: String?) {
+    val currentId = alarmId
+    if (currentId == null || id != currentId) {
+      // The ring ended between the module's check and this intent; a hold must not outlive it.
+      id?.let { AlarmSchedulerStore.clearRingHold(this, it) }
+      if (currentId == null) {
+        stopSelf()
+      }
+      return
+    }
+    val hold = AlarmSchedulerStore.ringHold(this)
+    val remaining = AlarmSchedulerRingHoldPolicy.remainingMillis(
+      hold,
+      currentId,
+      AlarmSchedulerStore.isComplete(this, currentId),
+      System.currentTimeMillis()
+    )
+    if (hold == null || remaining == null) {
+      return
+    }
+    applyHold(currentId, hold, remaining)
+  }
+
+  /** The app's "user walked away" path: the full ring comes back now. */
+  private fun handleRelease(id: String?) {
+    val currentId = alarmId
+    if (currentId == null || id != currentId) {
+      id?.let { AlarmSchedulerStore.clearRingHold(this, it) }
+      if (currentId == null) {
+        stopSelf()
+      }
+      return
+    }
+    if (holdRunnable != null) {
+      resumeFromHold(currentId)
+    } else {
+      AlarmSchedulerStore.clearRingHold(this, currentId)
+    }
+  }
+
+  private fun applyHold(id: String, hold: AlarmSchedulerRingHold, remainingMillis: Long) {
+    val isNewHold = holdRunnable == null
+    cancelHoldTimer()
+
+    // Scales the player only. STREAM_ALARM stays pinned by enforceAlarmVolume, so the full ring
+    // resumes at the alarm's own volume.
+    mediaPlayer?.let { player -> runCatching { player.setVolume(hold.volume, hold.volume) } }
+    if (hold.vibrate) {
+      if (vibrator == null) {
+        options?.let(::startVibration)
+      }
+    } else {
+      runCatching { vibrator?.cancel() }
+      vibrator = null
+    }
+
+    // Held time never counts toward maxRingDurationSeconds.
+    pauseTimeout()
+    // Keep the CPU awake past the hold so the resume below cannot be deferred by deep sleep.
+    extendWakeLock(remainingMillis + HOLD_WAKE_LOCK_MARGIN_MILLIS)
+
+    val runnable = Runnable {
+      if (alarmId == id) {
+        resumeFromHold(id)
+      }
+    }
+    holdRunnable = runnable
+    handler.postDelayed(runnable, remainingMillis)
+
+    if (isNewHold) {
+      emitState(id, "held", hold.heldUntil)
+    }
+  }
+
+  private fun resumeFromHold(id: String) {
+    cancelHoldTimer()
+    AlarmSchedulerStore.clearRingHold(this, id)
+    mediaPlayer?.let { player -> runCatching { player.setVolume(1f, 1f) } }
+    if (vibrator == null) {
+      options?.let(::startVibration)
+    }
+    extendWakeLock(pausedTimeoutMillis ?: DEFAULT_WAKE_LOCK_TIMEOUT_MILLIS)
+    resumeTimeout()
+    emitState(id, "alerting")
+  }
+
+  private fun cancelHoldTimer() {
+    holdRunnable?.let(handler::removeCallbacks)
+    holdRunnable = null
+  }
+
+  private fun emitState(id: String, state: String, heldUntil: Long? = null) {
+    val occurrence = occurrenceId?.let { AlarmSchedulerOccurrenceStore.occurrence(this, it) }
+    AlarmSchedulerEventBus.emitStateChange(
+      id,
+      state,
+      occurrence?.optJSONObject("metadata") ?: AlarmSchedulerStore.alarm(this, id)?.optJSONObject("metadata"),
+      occurrence,
+      heldUntil
+    )
+  }
+
+  // endregion
+
   private fun stopRinging() {
     val id = alarmId
+    id?.let { AlarmSchedulerStore.clearRingHold(this, it) }
     stopPlayback()
     activeAlarmId = null
     AlarmSchedulerStore.setActiveRingAlarmId(this, null)
@@ -201,6 +340,8 @@ class AlarmSchedulerRingService : Service() {
   private fun stopPlayback() {
     timeoutRunnable?.let(handler::removeCallbacks)
     timeoutRunnable = null
+    pausedTimeoutMillis = null
+    cancelHoldTimer()
 
     runCatching {
       mediaPlayer?.stop()
@@ -222,6 +363,7 @@ class AlarmSchedulerRingService : Service() {
     }
     wakeLock = null
     alarmId = null
+    occurrenceId = null
     options = null
   }
 
@@ -229,7 +371,7 @@ class AlarmSchedulerRingService : Service() {
 
   // region audio
 
-  private fun startPlayback(options: AlarmSchedulerOptions) {
+  private fun startPlayback(options: AlarmSchedulerOptions, playerVolume: Float) {
     val attributes = AudioAttributes.Builder()
       .setUsage(AudioAttributes.USAGE_ALARM)
       .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -241,6 +383,7 @@ class AlarmSchedulerRingService : Service() {
         player.setAudioAttributes(attributes)
         player.setDataSource(this, uri)
         player.isLooping = true
+        player.setVolume(playerVolume, playerVolume)
         player.prepare()
         player.start()
       }.isSuccess
@@ -356,6 +499,11 @@ class AlarmSchedulerRingService : Service() {
     }
   }
 
+  private fun extendWakeLock(timeoutMillis: Long) {
+    // Re-acquiring a non-reference-counted lock replaces its pending release.
+    runCatching { wakeLock?.acquire(timeoutMillis) }
+  }
+
   private fun scheduleTimeout(id: String, options: AlarmSchedulerOptions) {
     if (options.maxRingDurationSeconds <= 0) {
       return
@@ -372,8 +520,27 @@ class AlarmSchedulerRingService : Service() {
       AlarmSchedulerStore.record(this, id, "dismiss", details = mapOf("timedOut" to true))
       stopRinging()
     }
+    val delay = (options.maxRingDurationSeconds * 1000).roundToLong()
     timeoutRunnable = runnable
-    handler.postDelayed(runnable, (options.maxRingDurationSeconds * 1000).roundToLong())
+    timeoutDeadline = SystemClock.uptimeMillis() + delay
+    handler.postDelayed(runnable, delay)
+  }
+
+  private fun pauseTimeout() {
+    val runnable = timeoutRunnable ?: return
+    if (pausedTimeoutMillis != null) {
+      return
+    }
+    handler.removeCallbacks(runnable)
+    pausedTimeoutMillis = (timeoutDeadline - SystemClock.uptimeMillis()).coerceAtLeast(0)
+  }
+
+  private fun resumeTimeout() {
+    val runnable = timeoutRunnable ?: return
+    val remaining = pausedTimeoutMillis ?: return
+    pausedTimeoutMillis = null
+    timeoutDeadline = SystemClock.uptimeMillis() + remaining
+    handler.postDelayed(runnable, remaining)
   }
 
   // endregion
@@ -424,6 +591,8 @@ class AlarmSchedulerRingService : Service() {
     const val ACTION_STOP = "expo.modules.alarm.RING_STOP"
     const val ACTION_OPEN = "expo.modules.alarm.RING_OPEN"
     const val ACTION_COMPLETE = "expo.modules.alarm.RING_COMPLETE"
+    const val ACTION_HOLD = "expo.modules.alarm.RING_HOLD"
+    const val ACTION_RELEASE = "expo.modules.alarm.RING_RELEASE"
     const val EXTRA_ALARM_ID = "expo.modules.alarm.extra.ALARM_ID"
     const val EXTRA_IS_BACKUP = "expo.modules.alarm.extra.RING_IS_BACKUP"
     const val EXTRA_OCCURRENCE_ID = "expo.modules.alarm.extra.OCCURRENCE_ID"
@@ -431,6 +600,7 @@ class AlarmSchedulerRingService : Service() {
     private const val WAKE_LOCK_TAG = "AlarmScheduler:ring"
     private const val DEFAULT_WAKE_LOCK_TIMEOUT_MILLIS = 10 * 60 * 1000L
     private const val TIMEOUT_BACKUP_DELAY_SECONDS = 60.0
+    private const val HOLD_WAKE_LOCK_MARGIN_MILLIS = 60 * 1000L
 
     @Volatile
     private var activeAlarmId: String? = null
@@ -463,18 +633,49 @@ class AlarmSchedulerRingService : Service() {
       send(context, ACTION_COMPLETE, alarmId)
     }
 
+    /**
+     * Stores the hold before the service sees it so `getCurrentAlarmContextAsync` reports it the
+     * moment this returns. Only the alarm this service is ringing (or already holding) qualifies.
+     */
+    fun hold(
+      context: Context,
+      alarmId: String,
+      seconds: Double?,
+      volume: Double?,
+      vibrate: Boolean?
+    ): Map<String, Any> {
+      if (activeAlarmId != alarmId || AlarmSchedulerStore.isComplete(context, alarmId)) {
+        return mapOf("alarmId" to alarmId, "held" to false)
+      }
+      val hold = AlarmSchedulerRingHoldPolicy.start(alarmId, seconds, volume, vibrate, System.currentTimeMillis())
+      AlarmSchedulerStore.setRingHold(context, hold)
+      if (!send(context, ACTION_HOLD, alarmId)) {
+        AlarmSchedulerStore.clearRingHold(context, alarmId)
+        return mapOf("alarmId" to alarmId, "held" to false)
+      }
+      return mapOf("alarmId" to alarmId, "held" to true, "resumesAt" to hold.heldUntil)
+    }
+
+    fun release(context: Context, alarmId: String) {
+      if (activeAlarmId == alarmId) {
+        send(context, ACTION_RELEASE, alarmId)
+      } else {
+        AlarmSchedulerStore.clearRingHold(context, alarmId)
+      }
+    }
+
     fun stopIfRinging(context: Context, alarmId: String) {
       if (activeAlarmId == alarmId) {
         send(context, ACTION_COMPLETE, alarmId)
       }
     }
 
-    private fun send(context: Context, action: String, alarmId: String) {
+    private fun send(context: Context, action: String, alarmId: String): Boolean {
       val intent = Intent(context, AlarmSchedulerRingService::class.java).apply {
         this.action = action
         putExtra(EXTRA_ALARM_ID, alarmId)
       }
-      runCatching { context.startService(intent) }
+      return runCatching { context.startService(intent) }.getOrNull() != null
     }
 
     fun canPostNotifications(context: Context): Boolean {

@@ -178,7 +178,9 @@ export type AlarmContextState =
   | "scheduled"
   | "alerting"
   | "countdown"
-  | "paused";
+  | "paused"
+  /** Quieted by `holdRingAsync()`. The full ring resumes natively at `heldUntil`. */
+  | "held";
 
 export type AlarmContext = {
   id: string;
@@ -188,6 +190,8 @@ export type AlarmContext = {
   /** The concrete scheduled instance. Equal to `id` for a primary occurrence. */
   occurrenceId?: string;
   relationship?: AlarmOccurrenceRelationship;
+  /** Epoch ms when a held ring resumes unless the hold is renewed. Set only while `state` is `held`. */
+  heldUntil?: number;
 };
 
 /** How a scheduled occurrence relates to the alarm definition that created it. */
@@ -236,6 +240,29 @@ export type AlarmStateChange = {
   state: AlarmContextState;
   timestamp: number;
   metadata?: AlarmMetadata;
+  /** Epoch ms when a held ring resumes unless renewed. Set only on `held` events. */
+  heldUntil?: number;
+};
+
+/**
+ * Quiets a ringing alarm while the user completes a task in the app. The full ring always
+ * comes back natively when the hold runs out, so app death or a JS reload cannot leave it silent.
+ */
+export type RingHoldOptions = {
+  /** Seconds until the full ring resumes natively. Clamped 5–300. Default 30. */
+  seconds?: number;
+  /** Android: player level while held, 0–1 of the ring level. Default 0 (muted). */
+  volume?: number;
+  /** Android: keep vibrating while held. Default false. */
+  vibrate?: boolean;
+};
+
+export type RingHoldResult = {
+  alarmId: string;
+  /** False when the alarm was not ringing or held. Nothing changed. */
+  held: boolean;
+  /** Epoch ms when the full ring resumes unless renewed. */
+  resumesAt?: number;
 };
 
 export type NativeAlarmDebugState = {
