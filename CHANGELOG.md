@@ -7,9 +7,9 @@
   the GitHub Release fall back to "See CHANGELOG.md for details."
 -->
 
-## Unreleased
+## 1.1.0
 
-Targets 1.1.0. Every change is additive; existing callers behave exactly as in 1.0.1.
+Every change is additive; existing callers behave exactly as in 1.0.1.
 
 ### 🎉 New features
 
