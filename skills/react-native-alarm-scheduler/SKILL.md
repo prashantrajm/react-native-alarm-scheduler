@@ -132,6 +132,20 @@ Be honest about the guarantee, it differs per platform:
 
 Never promise a user that an iOS alarm is undismissable.
 
+### Quiet while the user works through the app
+
+Use `holdRingAsync(alarmId, { seconds: 30 })` once the app's dismissal task starts, and call it
+again on each burst of user activity. Do not build this from `completeNativeAlarmAsync` plus a JS
+timer that reschedules: a JS timer dies with the app, and the hold's resume is native on purpose.
+
+- It returns `held: false` and does nothing unless the alarm is ringing or already held. Check it.
+- A hold is not an outcome. It never completes, resolves or records an action, so the app must still
+  call `completeNativeAlarmAsync` when the task is done.
+- `releaseRingHoldAsync(alarmId)` brings the full ring back now ("user walked away").
+- Android quiets the ring service itself (`volume`, `vibrate`). iOS only re-arms the backup timer
+  `seconds` out; quieting the app's own in-app audio is the app's job, and `volume`/`vibrate` are
+  ignored there.
+
 ## Debugging checklist
 
 | Symptom | Check |

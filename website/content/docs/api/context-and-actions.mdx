@@ -17,10 +17,12 @@ const context = await AlarmScheduler.getCurrentAlarmContextAsync();
 type AlarmContext = {
   id: string;
   metadata?: AlarmMetadata;
-  state?: 'scheduled' | 'alerting' | 'countdown' | 'paused';
+  state?: 'scheduled' | 'alerting' | 'countdown' | 'paused' | 'held';
   nativeAlarmId?: string;
   occurrenceId?: string;
   relationship?: 'primary' | 'deferred' | 'followUp';
+  /** Epoch ms when a held ring resumes. Set only while `state` is `held`. */
+  heldUntil?: number;
 };
 ```
 
@@ -29,6 +31,9 @@ package. If the active native alarm is the deterministic backup timer, `id` rema
 logical alarm id and `nativeAlarmId` contains the backup UUID. If a one-shot alarm recently fired and
 AlarmKit already removed it from the daemon store, the package can still return the stored metadata
 for a short recovery window.
+
+An alarm quieted by [`holdRingAsync`](/api/ring-hold) reports `state: 'held'` and `heldUntil` on
+both platforms.
 
 On **Android** this returns the currently ringing alarm with `state: 'alerting'`, a waiting deferred
 or follow-up occurrence with `state: 'countdown'`, then falls back to a

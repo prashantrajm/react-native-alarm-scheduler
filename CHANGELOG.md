@@ -7,6 +7,36 @@
   the GitHub Release fall back to "See CHANGELOG.md for details."
 -->
 
+## Unreleased
+
+Targets 1.1.0. Every change is additive; existing callers behave exactly as in 1.0.1.
+
+### 🎉 New features
+
+- Add `holdRingAsync(alarmId, { seconds, volume, vibrate })` and `releaseRingHoldAsync(alarmId)`.
+  A hold quiets a ringing alarm while the user works through the app, renews on each call, and
+  resumes the full ring natively when it runs out, so app death or a JS reload always ends in a loud
+  ring. On Android the ring service scales its player and pauses vibration and the
+  `maxRingDurationSeconds` clock; the hold is persisted across a service restart. On iOS the hold
+  re-arms the deterministic AlarmKit backup timer `seconds` out.
+- Report `state: 'held'` and `heldUntil` from `getCurrentAlarmContextAsync()`, and emit `held` and
+  `alerting` through `onAlarmStateChange` as a hold starts and ends.
+- Support Expo SDK 58 (React Native 0.88, React 19.3) alongside SDK 57.
+
+### 🐛 Bug fixes
+
+- Fix the iOS build under Expo SDK 58, whose `ExpoModulesCore` `Exception` adds `message`: the
+  package's exception classes no longer declare a clashing `message` property.
+- Fix the config plugin crashing Android prebuild in `addPermission`. It passed the manifest's inner
+  node where the helper expects the whole manifest, and it now skips permissions already declared.
+
+### 💡 Others
+
+- Raise the podspec's iOS minimum from 15.1 to 16.4, the minimum of `ExpoModulesCore` 57 and 58.
+  AlarmKit needs iOS 26, so no device that could schedule an alarm is lost.
+- Move the example app to Expo SDK 58 and build the package with `expo-module-scripts` 56 and
+  TypeScript 6.
+
 ## 1.0.1
 
 ### 🐛 Bug fixes

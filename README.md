@@ -41,8 +41,9 @@ schedules an actual alarm.
 ## Requirements
 
 - An Expo or bare React Native app with native prebuild support — this module uses native code, so it does **not** work in Expo Go.
+- Expo SDK 57 or 58.
 - Android API 24+.
-- iOS 15.1+ for compatibility; iOS 26 SDK and runtime for actual AlarmKit scheduling.
+- iOS 16.4+ for compatibility; iOS 26 SDK and runtime for actual AlarmKit scheduling.
 
 Bare React Native apps need [Expo Modules](https://docs.expo.dev/bare/installing-expo-modules/) installed first.
 
@@ -142,6 +143,10 @@ await AlarmScheduler.scheduleAlarmAsync({
 The guarantee is absolute on Android and best-effort on iOS — see
 [Completion gating](https://react-native-alarm-scheduler.vercel.app/guides/completion-gating).
 
+While the user works through your app, `holdRingAsync(alarmId, { seconds: 30 })` quiets the ring and
+renews on each call. If the app stops renewing, is killed or reloads, the full ring comes back
+natively — see [Ring hold](https://react-native-alarm-scheduler.vercel.app/api/ring-hold).
+
 ## Platform support
 
 | Capability | Android | iOS |
@@ -151,6 +156,7 @@ The guarantee is absolute on Android and best-effort on iOS — see
 | Custom alarm sound | ✅ | ✅ physical device; system default in Simulator |
 | Silent alarm | ✅ | ✅ physical device; rejected in Simulator |
 | Ring until the app says stop (`openAppOnly`) | ✅ | ⚠️ |
+| Quiet the ring while the user completes a task in your app (`holdRingAsync`) | ✅ | ✅ backup timer only; the app quiets its own audio |
 | Cold-launch handoff, action records, backup alarms | ✅ | ✅ |
 | Deferred and follow-up alarm occurrences | ✅ | ✅ |
 | Survive reboot | ✅ | ✅ |
