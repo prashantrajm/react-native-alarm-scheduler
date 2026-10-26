@@ -28,27 +28,31 @@ struct IosAlarmOptionsRecord: Record {
 }
 
 final class InvalidAlarmException: Exception {
-  private let message: String
+  // Not `message`: ExpoModulesCore 58 adds `open var message` to Exception, and SDK 57 has none to
+  // override, so only a different name compiles against both.
+  private let detail: String
 
   override var reason: String {
-    message
+    detail
   }
 
   init(_ reason: String) {
-    self.message = reason
+    self.detail = reason
     super.init()
   }
 }
 
 final class UnsupportedAlarmException: Exception {
-  private let message: String
+  // Not `message`: ExpoModulesCore 58 adds `open var message` to Exception, and SDK 57 has none to
+  // override, so only a different name compiles against both.
+  private let detail: String
 
   override var reason: String {
-    message
+    detail
   }
 
   init(_ reason: String) {
-    self.message = reason
+    self.detail = reason
     super.init()
   }
 }
