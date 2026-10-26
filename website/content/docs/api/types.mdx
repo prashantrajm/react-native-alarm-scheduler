@@ -152,7 +152,7 @@ type AndroidAlarmOptions = {
 ## Context and actions
 
 ```ts
-type AlarmContextState = 'scheduled' | 'alerting' | 'countdown' | 'paused';
+type AlarmContextState = 'scheduled' | 'alerting' | 'countdown' | 'paused' | 'held';
 
 type AlarmContext = {
   id: string;
@@ -161,6 +161,7 @@ type AlarmContext = {
   nativeAlarmId?: string;
   occurrenceId?: string;
   relationship?: AlarmOccurrenceRelationship;
+  heldUntil?: number;
 };
 
 type AlarmActionType = 'nativeStop' | 'secondaryOpen' | 'snooze' | 'dismiss';
@@ -190,6 +191,23 @@ type AlarmStateChange = {
   state: AlarmContextState;
   timestamp: number;
   metadata?: AlarmMetadata;
+  heldUntil?: number;
+};
+```
+
+## Ring hold
+
+```ts
+type RingHoldOptions = {
+  seconds?: number; // clamped 5–300, default 30
+  volume?: number; // Android only, 0–1, default 0
+  vibrate?: boolean; // Android only, default false
+};
+
+type RingHoldResult = {
+  alarmId: string;
+  held: boolean;
+  resumesAt?: number;
 };
 ```
 

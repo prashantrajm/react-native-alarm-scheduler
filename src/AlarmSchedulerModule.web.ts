@@ -11,6 +11,8 @@ import type {
   AlarmSchedulerModuleEvents,
   NativeAlarmBackupResult,
   NativeAlarmDebugState,
+  RingHoldOptions,
+  RingHoldResult,
   ScheduledAlarm,
 } from "./AlarmScheduler.types";
 
@@ -102,6 +104,15 @@ class AlarmSchedulerModule extends NativeModule<AlarmSchedulerModuleEvents> {
   async cancelNativeAlarmBackupAsync(_alarmId: string): Promise<boolean> {
     return false;
   }
+
+  async holdRingAsync(
+    alarmId: string,
+    _options?: RingHoldOptions,
+  ): Promise<RingHoldResult> {
+    return { alarmId, held: false };
+  }
+
+  async releaseRingHoldAsync(_alarmId: string): Promise<void> {}
 
   async clearBypassAsync(_alarmId: string): Promise<void> {}
 

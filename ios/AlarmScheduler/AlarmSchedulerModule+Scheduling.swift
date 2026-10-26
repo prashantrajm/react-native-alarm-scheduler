@@ -99,6 +99,7 @@ extension AlarmSchedulerModule {
 
     AlarmSchedulerNativeAlarmStore.resetCompletion(alarmId: id)
     AlarmSchedulerNativeAlarmStore.clearActions(alarmId: id)
+    AlarmSchedulerNativeAlarmStore.clearHeldUntil(alarmId: id)
     cancelActiveOccurrenceRecords(alarmId: id)
     let didRemoveStoredAlarm = remove(id: id)
     removeRuntimeSound(alarmId: id)
@@ -258,6 +259,9 @@ extension AlarmSchedulerModule {
 
       if let alertingContext = activeContexts.first(where: { ($0["state"] as? String) == "alerting" }) {
         return alertingContext
+      }
+      if let heldContext = heldRingContext() {
+        return heldContext
       }
       if let countdownContext = activeContexts.first(where: { ($0["state"] as? String) == "countdown" }) {
         return countdownContext

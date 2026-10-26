@@ -88,7 +88,7 @@ cd example/android
 iOS validation:
 
 ```sh
-xcodebuild -quiet -workspace example/ios/mymoduleexample.xcworkspace -scheme mymoduleexample -configuration Debug -sdk iphonesimulator -destination "generic/platform=iOS Simulator" build
+xcodebuild -quiet -workspace example/ios/reactnativealarmschedulerexample.xcworkspace -scheme reactnativealarmschedulerexample -configuration Debug -sdk iphonesimulator -destination "generic/platform=iOS Simulator" build
 ```
 
 The simulator build validates compilation only for runtime custom sounds. When changing sound

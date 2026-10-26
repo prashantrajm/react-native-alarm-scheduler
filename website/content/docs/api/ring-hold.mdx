@@ -1,0 +1,92 @@
+---
+title: Ring hold
+description: Quiet a ringing alarm while the user works through your app, with a native resume.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+A ring hold quiets a ringing alarm for a few seconds while the user works through your app's
+dismissal task (a puzzle, a step count, a typed phrase), then brings the full ring back on its own.
+Your app keeps it quiet by renewing the hold on each burst of user activity. If the user stops,
+leaves the app, or the app dies, the timer runs out natively and the alarm rings again. No JS is
+involved in resuming.
+
+## `holdRingAsync(alarmId, options?)`
+
+```ts
+const { held, resumesAt } = await AlarmScheduler.holdRingAsync(alarmId, { seconds: 30 });
+```
+
+```ts
+type RingHoldOptions = {
+  /** Seconds until the full ring resumes natively. Clamped 5–300. Default 30. */
+  seconds?: number;
+  /** Android: player level while held, 0–1 of the ring level. Default 0 (muted). */
+  volume?: number;
+  /** Android: keep vibrating while held. Default false. */
+  vibrate?: boolean;
+};
+
+type RingHoldResult = {
+  alarmId: string;
+  /** False when the alarm was not ringing or held. Nothing changed. */
+  held: boolean;
+  /** Epoch ms when the full ring resumes unless renewed. */
+  resumesAt?: number;
+};
+```
+
+The contract is the same on both platforms:
+
+1. **Only an alarm that is ringing or already held can be held.** Anything else returns
+   `held: false` and changes nothing. A hold never creates a ring.
+2. **Calling it again renews.** The timer restarts with no audible change.
+3. **Resuming is native.** When the timer runs out the ring comes back at its scheduled volume, with
+   vibration. App death, a force-quit or a JS reload all end in a loud ring.
+4. **A hold is not an outcome.** It never completes the alarm, resolves an occurrence, records a
+   `nativeStop`, `snooze` or `dismiss` action, or counts toward `maxRingDurationSeconds`.
+5. **`completeNativeAlarmAsync` ends a hold** along with the ring. No resume fires afterwards.
+
+```ts
+// On the screen where the user completes the task
+useEffect(() => {
+  const renew = () => AlarmScheduler.holdRingAsync(alarmId, { seconds: 30 });
+  renew();
+  const subscription = onUserActivity(renew); // taps, keystrokes, sensor input
+  return () => subscription.remove();
+}, [alarmId]);
+```
+
+## `releaseRingHoldAsync(alarmId)`
+
+The "user walked away" path: the full ring resumes immediately instead of waiting out the timer.
+Releasing an alarm that is not held does nothing.
+
+```ts
+await AlarmScheduler.releaseRingHoldAsync(alarmId);
+```
+
+## State while held
+
+`getCurrentAlarmContextAsync()` reports `state: 'held'` with `heldUntil` (epoch ms) for as long as the
+hold lasts. `onAlarmStateChange` emits `held` when a hold starts, with `heldUntil`, and `alerting` when
+the full ring resumes. Renewals emit nothing.
+
+## Platform behavior
+
+**Android.** The hold lives in the foreground ring service, so its timer outlives the app's process.
+It scales the player to `volume` and stops vibration unless `vibrate` is true. The alarm stream stays
+pinned at the alarm's volume, so the ring resumes at exactly that level. The hold is persisted: if
+the system restarts the service mid-hold, it comes back quiet for whatever time was left.
+
+**iOS.** AlarmKit has no volume or vibration control, and its alert is already dismissed by the time
+an `openAppOnly` alarm opens your app. A hold re-arms the alarm's one deterministic backup timer
+`seconds` out, the same timer `scheduleNativeAlarmBackupAsync` manages. `volume` and `vibrate` are
+ignored: quieting your own in-app audio is your app's job. An alarm counts as ringing when AlarmKit
+is alerting it, when its backup timer is counting down, or when its occurrence was marked ringing
+within the last hour.
+
+<Callout type="warn" title="Snoozes are not holds">
+On iOS a deferred or follow-up occurrence counting down is a snooze, not a ring, so holding it
+returns `held: false` rather than cutting the snooze short.
+</Callout>

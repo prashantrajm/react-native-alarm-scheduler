@@ -7,6 +7,7 @@
     "context-and-actions",
     "occurrences",
     "completion-and-backup",
+    "ring-hold",
     "system-clock",
     "debugging",
     "events",

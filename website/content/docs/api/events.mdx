@@ -36,9 +36,11 @@ type AlarmStateChange = {
   id: string;
   occurrenceId?: string;
   relationship?: 'primary' | 'deferred' | 'followUp';
-  state: 'scheduled' | 'alerting' | 'countdown' | 'paused';
+  state: 'scheduled' | 'alerting' | 'countdown' | 'paused' | 'held';
   timestamp: number;
   metadata?: AlarmMetadata;
+  /** Epoch ms when a held ring resumes. Set only on `held` events. */
+  heldUntil?: number;
 };
 ```
 

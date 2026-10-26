@@ -25,17 +25,19 @@ const withAlarmScheduler = (config, props = {}) => {
   const iosAlarmSounds = normalizeIosAlarmSounds(props.iosAlarmSounds);
 
   config = withAndroidManifest(config, (modConfig) => {
-    const manifest = modConfig.modResults.manifest;
+    // The Permissions helpers take the whole AndroidManifest (`{ manifest: … }`), not its inner
+    // `manifest` node; passing the inner node throws on every prebuild.
+    const manifest = modConfig.modResults;
     if (addExactAlarmPermission) {
-      AndroidConfig.Permissions.addPermission(manifest, 'android.permission.SCHEDULE_EXACT_ALARM');
+      AndroidConfig.Permissions.ensurePermission(manifest, 'android.permission.SCHEDULE_EXACT_ALARM');
     }
     if (addNotificationPermission) {
-      AndroidConfig.Permissions.addPermission(manifest, 'android.permission.POST_NOTIFICATIONS');
+      AndroidConfig.Permissions.ensurePermission(manifest, 'android.permission.POST_NOTIFICATIONS');
     }
     if (addUseExactAlarmPermission) {
-      AndroidConfig.Permissions.addPermission(manifest, 'android.permission.USE_EXACT_ALARM');
+      AndroidConfig.Permissions.ensurePermission(manifest, 'android.permission.USE_EXACT_ALARM');
     }
-    AndroidConfig.Permissions.addPermission(manifest, 'com.android.alarm.permission.SET_ALARM');
+    AndroidConfig.Permissions.ensurePermission(manifest, 'com.android.alarm.permission.SET_ALARM');
     return modConfig;
   });
 

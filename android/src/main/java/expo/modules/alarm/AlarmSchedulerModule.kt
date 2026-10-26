@@ -64,6 +64,12 @@ class AndroidAlarmOptionsRecord : Record {
   @Field var backupDelaySeconds: Double? = null
 }
 
+class RingHoldOptionsRecord : Record {
+  @Field var seconds: Double? = null
+  @Field var volume: Double? = null
+  @Field var vibrate: Boolean? = null
+}
+
 class AlarmSchedulerModule : Module() {
   private val observedEvents = mutableSetOf<String>()
 
@@ -150,6 +156,7 @@ class AlarmSchedulerModule : Module() {
       val context = requireContext()
       // Order matters: mark complete first so a backup broadcast already in flight stays quiet.
       AlarmSchedulerStore.complete(context, alarmId)
+      AlarmSchedulerStore.clearRingHold(context, alarmId)
       AlarmSchedulerScheduler.cancelBackups(context, alarmId)
       AlarmSchedulerRingService.complete(context, alarmId)
       AlarmSchedulerStore.clearActionsForAlarm(context, alarmId)
@@ -185,6 +192,14 @@ class AlarmSchedulerModule : Module() {
 
     AsyncFunction("cancelNativeAlarmBackupAsync") { alarmId: String ->
       AlarmSchedulerScheduler.cancelBackups(requireContext(), alarmId)
+    }
+
+    AsyncFunction("holdRingAsync") { alarmId: String, options: RingHoldOptionsRecord? ->
+      AlarmSchedulerRingService.hold(requireContext(), alarmId, options?.seconds, options?.volume, options?.vibrate)
+    }
+
+    AsyncFunction("releaseRingHoldAsync") { alarmId: String ->
+      AlarmSchedulerRingService.release(requireContext(), alarmId)
     }
 
     AsyncFunction("clearBypassAsync") { alarmId: String ->
@@ -294,6 +309,16 @@ class AlarmSchedulerModule : Module() {
     val ringingId = AlarmSchedulerRingService.activeAlarmId() ?: AlarmSchedulerStore.activeRingAlarmId(context)
     if (ringingId != null) {
       AlarmSchedulerStore.alarm(context, ringingId)?.let { stored ->
+        val hold = AlarmSchedulerStore.ringHold(context)
+        val held = AlarmSchedulerRingHoldPolicy.remainingMillis(
+          hold,
+          ringingId,
+          AlarmSchedulerStore.isComplete(context, ringingId),
+          System.currentTimeMillis()
+        ) != null
+        if (held && hold != null) {
+          return alarmContext(stored, "held") + ("heldUntil" to hold.heldUntil)
+        }
         return alarmContext(stored, "alerting")
       }
     }

@@ -1,6 +1,6 @@
 {
   "name": "react-native-alarm-scheduler",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Native alarm scheduling for React Native and Expo apps",
   "main": "build/index.js",
   "types": "build/index.d.ts",
@@ -51,10 +51,10 @@
   "homepage": "https://github.com/prashantrajm/react-native-alarm-scheduler#readme",
   "dependencies": {},
   "devDependencies": {
-    "@types/react": "~19.1.1",
-    "expo-module-scripts": "^55.0.2",
-    "expo": "^55.0.24",
-    "react-native": "0.82.1"
+    "@types/react": "~19.3.0",
+    "expo-module-scripts": "^56.0.3",
+    "expo": "~58.0.19",
+    "react-native": "0.88.0"
   },
   "peerDependencies": {
     "expo": "*",

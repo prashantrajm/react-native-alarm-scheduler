@@ -23,6 +23,7 @@ internal object AlarmSchedulerStore {
   private const val KEY_PENDING_HANDOFF = "alarm_scheduler_pending_handoff"
   private const val KEY_INTENT_DEBUG_COUNTS = "alarm_scheduler_intent_debug_counts"
   private const val KEY_ACTIVE_RING = "alarm_scheduler_active_ring"
+  private const val KEY_RING_HOLD = "alarm_scheduler_ring_hold"
   private const val KEY_MIGRATED = "alarm_scheduler_migrated_v2"
 
   private val reservedKeys = setOf(
@@ -32,6 +33,7 @@ internal object AlarmSchedulerStore {
     KEY_PENDING_HANDOFF,
     KEY_INTENT_DEBUG_COUNTS,
     KEY_ACTIVE_RING,
+    KEY_RING_HOLD,
     KEY_MIGRATED
   )
 
@@ -281,6 +283,38 @@ internal object AlarmSchedulerStore {
   }
 
   fun activeRingAlarmId(context: Context): String? = prefs(context).getString(KEY_ACTIVE_RING, null)
+
+  // endregion
+
+  // region ring hold
+
+  /** Only one alarm rings at a time, so at most one hold is ever stored. */
+  fun setRingHold(context: Context, hold: AlarmSchedulerRingHold) {
+    val json = JSONObject()
+      .put("alarmId", hold.alarmId)
+      .put("heldUntil", hold.heldUntil)
+      .put("volume", hold.volume.toDouble())
+      .put("vibrate", hold.vibrate)
+    prefs(context).edit().putString(KEY_RING_HOLD, json.toString()).apply()
+  }
+
+  fun ringHold(context: Context): AlarmSchedulerRingHold? {
+    val raw = prefs(context).getString(KEY_RING_HOLD, null) ?: return null
+    val json = runCatching { JSONObject(raw) }.getOrNull() ?: return null
+    val alarmId = json.optString("alarmId").takeIf(String::isNotBlank) ?: return null
+    return AlarmSchedulerRingHold(
+      alarmId = alarmId,
+      heldUntil = json.optLong("heldUntil"),
+      volume = json.optDouble("volume", 0.0).toFloat(),
+      vibrate = json.optBoolean("vibrate", false)
+    )
+  }
+
+  fun clearRingHold(context: Context, alarmId: String) {
+    if (ringHold(context)?.alarmId == alarmId) {
+      prefs(context).edit().remove(KEY_RING_HOLD).apply()
+    }
+  }
 
   // endregion
 }
