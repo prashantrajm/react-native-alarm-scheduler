@@ -504,7 +504,6 @@ extension AlarmSchedulerModule {
   private func makeAlarmKitSchedule(hour: Int, minute: Int, weekdays: [Int], timestamp: Int64?) throws -> Alarm.Schedule {
     let time = Alarm.Schedule.Relative.Time(hour: hour, minute: minute)
     if weekdays.isEmpty {
-      // A one-shot alarm with a future `timestamp` rings at that exact date, as on Android, not at the next hh:mm.
       if let timestamp {
         return .fixed(Date(timeIntervalSince1970: Double(timestamp) / 1000))
       }
