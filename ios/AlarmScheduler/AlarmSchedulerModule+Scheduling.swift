@@ -16,8 +16,8 @@ extension AlarmSchedulerModule {
     let title = alarm.title?.isEmpty == false ? alarm.title! : "Alarm"
     let weekdays = try normalizeWeekdays(alarm.weekdays)
     let metadata = normalizeMetadata(alarm.ios?.metadata, id: id, title: title)
-    let timestamp = alarm.timestamp.flatMap { $0 > Date().timeIntervalSince1970 * 1000 ? Int64($0) : nil }
-      ?? nextTriggerTimestamp(hour: hour, minute: minute, weekdays: weekdays)
+    let futureTimestamp = alarm.timestamp.flatMap { $0 > Date().timeIntervalSince1970 * 1000 ? Int64($0) : nil }
+    let timestamp = futureTimestamp ?? nextTriggerTimestamp(hour: hour, minute: minute, weekdays: weekdays)
     let runtimeSoundUri = normalizedSoundName(alarm.ios?.soundUri) ?? normalizedSoundName(alarm.soundUri)
     let soundName: String?
     if alarm.ios?.silent == true {
@@ -39,6 +39,7 @@ extension AlarmSchedulerModule {
         hour: hour,
         minute: minute,
         weekdays: weekdays,
+        fixedTimestamp: weekdays.isEmpty ? futureTimestamp : nil,
         options: alarm.ios,
         metadata: metadata,
         soundName: soundName,
@@ -287,6 +288,7 @@ extension AlarmSchedulerModule {
     hour: Int,
     minute: Int,
     weekdays: [Int],
+    fixedTimestamp: Int64?,
     options: IosAlarmOptionsRecord?,
     metadata: [String: Any],
     soundName: String?,
@@ -321,7 +323,7 @@ extension AlarmSchedulerModule {
       metadata: AlarmSchedulerMetadata(alarmId: id, title: title, values: alarmKitMetadataValues(metadata)),
       tintColor: Color.accentColor
     )
-    let schedule = try makeAlarmKitSchedule(hour: hour, minute: minute, weekdays: weekdays)
+    let schedule = try makeAlarmKitSchedule(hour: hour, minute: minute, weekdays: weekdays, fixedTimestamp: fixedTimestamp)
     let effectiveSoundName = alarmSchedulerEffectiveSoundName(soundName)
     let stopIntent = makeStopIntent(
       id: id,
@@ -499,7 +501,11 @@ extension AlarmSchedulerModule {
   }
 
   @available(iOS 26.0, *)
-  private func makeAlarmKitSchedule(hour: Int, minute: Int, weekdays: [Int]) throws -> Alarm.Schedule {
+  private func makeAlarmKitSchedule(hour: Int, minute: Int, weekdays: [Int], fixedTimestamp: Int64?) throws -> Alarm.Schedule {
+    // A one-shot alarm with a future `timestamp` rings at that exact date, as on Android, not at the next hh:mm.
+    if let fixedTimestamp {
+      return .fixed(Date(timeIntervalSince1970: Double(fixedTimestamp) / 1000))
+    }
     let time = Alarm.Schedule.Relative.Time(hour: hour, minute: minute)
     if weekdays.isEmpty {
       return .relative(.init(time: time, repeats: .never))
