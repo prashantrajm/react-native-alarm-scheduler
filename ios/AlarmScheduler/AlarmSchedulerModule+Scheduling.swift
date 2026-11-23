@@ -39,7 +39,7 @@ extension AlarmSchedulerModule {
         hour: hour,
         minute: minute,
         weekdays: weekdays,
-        fixedTimestamp: weekdays.isEmpty ? futureTimestamp : nil,
+        timestamp: futureTimestamp,
         options: alarm.ios,
         metadata: metadata,
         soundName: soundName,
@@ -288,7 +288,7 @@ extension AlarmSchedulerModule {
     hour: Int,
     minute: Int,
     weekdays: [Int],
-    fixedTimestamp: Int64?,
+    timestamp: Int64?,
     options: IosAlarmOptionsRecord?,
     metadata: [String: Any],
     soundName: String?,
@@ -323,7 +323,7 @@ extension AlarmSchedulerModule {
       metadata: AlarmSchedulerMetadata(alarmId: id, title: title, values: alarmKitMetadataValues(metadata)),
       tintColor: Color.accentColor
     )
-    let schedule = try makeAlarmKitSchedule(hour: hour, minute: minute, weekdays: weekdays, fixedTimestamp: fixedTimestamp)
+    let schedule = try makeAlarmKitSchedule(hour: hour, minute: minute, weekdays: weekdays, timestamp: timestamp)
     let effectiveSoundName = alarmSchedulerEffectiveSoundName(soundName)
     let stopIntent = makeStopIntent(
       id: id,
@@ -501,13 +501,13 @@ extension AlarmSchedulerModule {
   }
 
   @available(iOS 26.0, *)
-  private func makeAlarmKitSchedule(hour: Int, minute: Int, weekdays: [Int], fixedTimestamp: Int64?) throws -> Alarm.Schedule {
-    // A one-shot alarm with a future `timestamp` rings at that exact date, as on Android, not at the next hh:mm.
-    if let fixedTimestamp {
-      return .fixed(Date(timeIntervalSince1970: Double(fixedTimestamp) / 1000))
-    }
+  private func makeAlarmKitSchedule(hour: Int, minute: Int, weekdays: [Int], timestamp: Int64?) throws -> Alarm.Schedule {
     let time = Alarm.Schedule.Relative.Time(hour: hour, minute: minute)
     if weekdays.isEmpty {
+      // A one-shot alarm with a future `timestamp` rings at that exact date, as on Android, not at the next hh:mm.
+      if let timestamp {
+        return .fixed(Date(timeIntervalSince1970: Double(timestamp) / 1000))
+      }
       return .relative(.init(time: time, repeats: .never))
     }
     return .relative(.init(time: time, repeats: .weekly(weekdays.map(toLocaleWeekday))))
